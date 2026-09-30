@@ -6,10 +6,26 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // User profiles: readable by any signed-in user, writable only by owner.
+    // Public profiles. Created once, in the same batch as the username claim.
     match /users/{uid} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.emailLower == request.auth.token.email.lower()
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
+      allow update: if false;   // profile editing is out of scope
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Username uniqueness claims. Create-only; a set on an existing doc is an update and is denied.
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && username.matches('^[a-z0-9_]{3,20}$')
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
+      allow update: if false;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // Chats: only participants may read/write.
