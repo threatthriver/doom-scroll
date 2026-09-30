@@ -1,0 +1,105 @@
+{
+  "project_info": {
+    "project_number": "753813530432",
+    "project_id": "secure-message-app-0602",
+    "storage_bucket": "secure-message-app-0602.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753813530432:android:bde613eeb572e25682bca5",
+        "android_client_info": {
+          "package_name": "com.example.secure_message_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753813530432-rnrdrc77sllls6mjbenner8lo5e3iitl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.secure_message_app",
+            "certificate_hash": "e0bb18cf6442f32b358a5248bd8cc9d3e8f8ebdd"
+          }
+        },
+        {
+          "client_id": "753813530432-doriip3pb1irq0c480gviv1lsntq2h3p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5h-Gpuw8_2HhrZE-cLzTbnUJeFQFgjPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753813530432-doriip3pb1irq0c480gviv1lsntq2h3p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753813530432:android:901d6980403a775e82bca5",
+        "android_client_info": {
+          "package_name": "com.securemessage.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753813530432-doriip3pb1irq0c480gviv1lsntq2h3p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5h-Gpuw8_2HhrZE-cLzTbnUJeFQFgjPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753813530432-doriip3pb1irq0c480gviv1lsntq2h3p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753813530432:android:1de836eb1e77f49b82bca5",
+        "android_client_info": {
+          "package_name": "com.senderwire.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753813530432-doriip3pb1irq0c480gviv1lsntq2h3p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB5h-Gpuw8_2HhrZE-cLzTbnUJeFQFgjPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753813530432-doriip3pb1irq0c480gviv1lsntq2h3p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
