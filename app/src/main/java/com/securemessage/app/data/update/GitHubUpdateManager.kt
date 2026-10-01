@@ -203,17 +203,20 @@ object GitHubUpdateManager {
         }
     }
 
-    private fun isNewerVersion(currentVersion: String, remoteVersion: String): Boolean {
-        val currParts = currentVersion.removePrefix("v").split(".").mapNotNull { it.toIntOrNull() }
-        val remoteParts = remoteVersion.removePrefix("v").split(".").mapNotNull { it.toIntOrNull() }
+    internal fun isNewerVersion(currentVersion: String, remoteVersion: String): Boolean {
+        val currParts = currentVersion.trim().removePrefix("v").removePrefix("V").split(".").mapNotNull { it.trim().toIntOrNull() }
+        val remoteParts = remoteVersion.trim().removePrefix("v").removePrefix("V").split(".").mapNotNull { it.trim().toIntOrNull() }
 
-        val length = maxOf(currParts.size, remoteParts.size)
-        for (i in 0 until length) {
-            val curr = currParts.getOrElse(i) { 0 }
-            val remote = remoteParts.getOrElse(i) { 0 }
-            if (remote > curr) return true
-            if (remote < curr) return false
+        if (currParts.isNotEmpty() && remoteParts.isNotEmpty()) {
+            val length = maxOf(currParts.size, remoteParts.size)
+            for (i in 0 until length) {
+                val curr = currParts.getOrElse(i) { 0 }
+                val remote = remoteParts.getOrElse(i) { 0 }
+                if (remote > curr) return true
+                if (remote < curr) return false
+            }
+            return false
         }
-        return remoteVersion.trim() != currentVersion.trim() && remoteVersion.isNotBlank()
+        return remoteVersion.trim().removePrefix("v") != currentVersion.trim().removePrefix("v") && remoteVersion.isNotBlank()
     }
 }
