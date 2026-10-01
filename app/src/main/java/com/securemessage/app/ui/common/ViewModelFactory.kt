@@ -34,5 +34,9 @@ object AppViewModelFactory {
             val c = container()
             ChatViewModel(createSavedStateHandle(), c.chatRepository, c.authRepository)
         }
+        initializer {
+            val c = container()
+            com.securemessage.app.ui.profile.ProfileViewModel(c.authRepository, c.userRepository)
+        }
     }
 }

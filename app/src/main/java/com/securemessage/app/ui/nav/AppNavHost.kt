@@ -14,6 +14,7 @@ import com.securemessage.app.ui.auth.SignInScreen
 import com.securemessage.app.ui.auth.SignUpScreen
 import com.securemessage.app.ui.chat.ChatScreen
 import com.securemessage.app.ui.conversations.ConversationsScreen
+import com.securemessage.app.ui.main.MainScreen
 import com.securemessage.app.ui.users.UserSearchScreen
 
 /** Navigate and clear the entire back stack. */
@@ -58,8 +59,7 @@ fun AppNavHost(container: AppContainer) {
             )
         }
         composable(Routes.CONVERSATIONS) {
-            ConversationsScreen(
-                onNewChat = { nav.navigate(Routes.USERS) },
+            MainScreen(
                 onOpenChat = { id -> nav.navigate(Routes.chat(id)) },
                 onNeedsProfile = { nav.navigateClearing(Routes.completeProfile()) },
                 onSignedOut = { nav.navigateClearing(Routes.SIGN_IN) },

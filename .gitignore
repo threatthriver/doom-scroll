@@ -5,3 +5,6 @@ app/build/
 *.iml
 local.properties
 .kotlin/
+*.png
+.agents/
+telegram_exploration/

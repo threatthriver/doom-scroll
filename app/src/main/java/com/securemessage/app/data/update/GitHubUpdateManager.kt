@@ -1,0 +1,219 @@
+package com.securemessage.app.data.update
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.URL
+
+object GitHubUpdateManager {
+    private const val GITHUB_OWNER = "threatthriver"
+    private const val GITHUB_REPO = "doom-scroll"
+    private const val API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+
+    fun checkForUpdate(currentVersionName: String): Flow<UpdateState> = flow {
+        emit(UpdateState.Checking)
+        try {
+            val url = URL(API_URL)
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/vnd.github.v3+json")
+                setRequestProperty("User-Agent", "DoomScroll-Updater")
+                connectTimeout = 10000
+                readTimeout = 10000
+            }
+
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
+                emit(UpdateState.UpToDate(currentVersionName))
+                return@flow
+            }
+            if (responseCode !in 200..299) {
+                emit(UpdateState.Error("Failed to check updates (HTTP $responseCode)"))
+                return@flow
+            }
+
+            val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(responseText)
+            val tagName = json.optString("tag_name", "").trim()
+            val releaseName = json.optString("name", tagName)
+            val releaseBody = json.optString("body", "No changelog provided.")
+            val htmlUrl = json.optString("html_url", "")
+
+            var apkUrl: String? = null
+            var apkName: String? = null
+            var apkSize = 0L
+
+            val assets = json.optJSONArray("assets")
+            if (assets != null) {
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    val name = asset.optString("name", "")
+                    if (name.endsWith(".apk", ignoreCase = true)) {
+                        apkUrl = asset.optString("browser_download_url", "")
+                        apkName = name
+                        apkSize = asset.optLong("size", 0L)
+                        break
+                    }
+                }
+            }
+
+            val release = GitHubRelease(
+                tagName = tagName,
+                name = releaseName,
+                body = releaseBody,
+                htmlUrl = htmlUrl,
+                apkDownloadUrl = apkUrl,
+                apkFileName = apkName,
+                apkSize = apkSize
+            )
+
+            if (isNewerVersion(currentVersionName, tagName) && apkUrl != null) {
+                emit(UpdateState.Available(release, currentVersionName))
+            } else {
+                emit(UpdateState.UpToDate(currentVersionName))
+            }
+        } catch (e: Exception) {
+            emit(UpdateState.Error(e.localizedMessage ?: "Unknown update error"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    fun downloadAndInstallUpdate(
+        context: Context,
+        release: GitHubRelease
+    ): Flow<UpdateState> = flow {
+        val downloadUrl = release.apkDownloadUrl
+        if (downloadUrl.isNullOrBlank()) {
+            emit(UpdateState.Error("No APK attached to release ${release.tagName}"))
+            return@flow
+        }
+
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.cacheDir
+        if (!dir.exists()) dir.mkdirs()
+        val sanitizedTag = release.tagName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+        val apkFile = File(dir, "doomscroll_update_$sanitizedTag.apk")
+
+        try {
+            var currentUrl = downloadUrl
+            var connection: HttpURLConnection? = null
+            var redirects = 0
+            val maxRedirects = 6
+
+            // Follow HTTP redirects safely (GitHub asset downloads redirect to AWS S3/Azure blobs)
+            while (redirects < maxRedirects) {
+                val url = URL(currentUrl)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = false
+                    setRequestProperty("User-Agent", "DoomScroll-Updater")
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                }
+                val code = connection.responseCode
+                if (code == HttpURLConnection.HTTP_MOVED_PERM ||
+                    code == HttpURLConnection.HTTP_MOVED_TEMP ||
+                    code == HttpURLConnection.HTTP_SEE_OTHER ||
+                    code == 307 || code == 308
+                ) {
+                    val location = connection.getHeaderField("Location")
+                    if (location != null) {
+                        currentUrl = location
+                        redirects++
+                        connection.disconnect()
+                        continue
+                    }
+                }
+                break
+            }
+
+            val conn = connection ?: throw IllegalStateException("Could not open download connection")
+            val totalBytes = conn.contentLengthLong.let { if (it > 0) it else release.apkSize }
+
+            var downloadedBytes = 0L
+            val inputStream: InputStream = conn.inputStream
+            val outputStream = FileOutputStream(apkFile)
+
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+
+            inputStream.use { input ->
+                outputStream.use { output ->
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        downloadedBytes += bytesRead
+                        val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
+                        emit(UpdateState.Downloading(release, progress, downloadedBytes, totalBytes))
+                    }
+                    output.flush()
+                }
+            }
+
+            emit(UpdateState.ReadyToInstall(release, apkFile))
+        } catch (e: Exception) {
+            if (apkFile.exists()) {
+                apkFile.delete()
+            }
+            emit(UpdateState.Error("Download failed: ${e.localizedMessage}"))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    suspend fun promptInstall(context: Context, apkFile: File): Boolean = withContext(Dispatchers.Main) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    val manageIntent = Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}")
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(manageIntent)
+                    return@withContext false
+                }
+            }
+
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun isNewerVersion(currentVersion: String, remoteVersion: String): Boolean {
+        val currParts = currentVersion.removePrefix("v").split(".").mapNotNull { it.toIntOrNull() }
+        val remoteParts = remoteVersion.removePrefix("v").split(".").mapNotNull { it.toIntOrNull() }
+
+        val length = maxOf(currParts.size, remoteParts.size)
+        for (i in 0 until length) {
+            val curr = currParts.getOrElse(i) { 0 }
+            val remote = remoteParts.getOrElse(i) { 0 }
+            if (remote > curr) return true
+            if (remote < curr) return false
+        }
+        return remoteVersion.trim() != currentVersion.trim() && remoteVersion.isNotBlank()
+    }
+}
