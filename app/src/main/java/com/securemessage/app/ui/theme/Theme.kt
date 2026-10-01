@@ -1,31 +1,53 @@
 package com.securemessage.app.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 
-private val LightColors = lightColorScheme(primary = Indigo40, secondary = Teal40)
-private val DarkColors = darkColorScheme(primary = Indigo80, secondary = Teal80)
+private val MonochromeDarkColors = darkColorScheme(
+    primary = PureWhite,
+    onPrimary = PureBlack,
+    primaryContainer = PureWhite,
+    onPrimaryContainer = PureBlack,
+    inversePrimary = PureBlack,
+    secondary = TextSecondary,
+    onSecondary = PureBlack,
+    secondaryContainer = ObsidianCard,
+    onSecondaryContainer = PureWhite,
+    tertiary = TextMuted,
+    onTertiary = PureWhite,
+    background = ObsidianVoid,
+    onBackground = PureWhite,
+    surface = ObsidianSurface,
+    onSurface = PureWhite,
+    surfaceDim = ObsidianVoid,
+    surfaceBright = ObsidianSurfaceElevated,
+    surfaceContainerLowest = ObsidianVoid,
+    surfaceContainerLow = ObsidianSurface,
+    surfaceContainer = ObsidianSurfaceElevated,
+    surfaceContainerHigh = ObsidianCard,
+    surfaceContainerHighest = HairlineBorder,
+    surfaceVariant = ObsidianCard,
+    onSurfaceVariant = TextSecondary,
+    inverseSurface = PureWhite,
+    inverseOnSurface = PureBlack,
+    outline = HairlineBorder,
+    outlineVariant = HairlineBorderSubtle,
+    error = PureWhite,
+    onError = PureBlack,
+    errorContainer = ObsidianCard,
+    onErrorContainer = PureWhite,
+)
 
 @Composable
 fun SecureMessageTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean = true,
+    dynamicColor: Boolean = false, // Strictly false to preserve pure black and white monochromatic theme
     content: @Composable () -> Unit,
 ) {
-    val colors = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val ctx = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
-        }
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-    MaterialTheme(colorScheme = colors, typography = AppTypography, content = content)
+    MaterialTheme(
+        colorScheme = MonochromeDarkColors,
+        typography = AppTypography,
+        content = content,
+    )
 }
