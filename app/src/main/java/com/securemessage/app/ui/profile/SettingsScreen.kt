@@ -269,18 +269,22 @@ fun SettingsScreen(
                         }
                     }
 
-                    Button(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            vm.checkForUpdates(silent = false)
-                        },
-                        enabled = !state.isCheckingUpdates,
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = PureWhite,
-                            contentColor = PureBlack,
-                        ),
-                        modifier = Modifier.height(36.dp),
+                    val apkFile = state.downloadedApkFile
+                    val hasDownloadedApk = apkFile != null && apkFile.exists()
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(PureWhite)
+                            .clickable(enabled = !state.isCheckingUpdates) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                if (hasDownloadedApk) {
+                                    vm.installDownloadedApk(context)
+                                } else {
+                                    vm.checkForUpdates(silent = false)
+                                }
+                            }
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (state.isCheckingUpdates) {
                             CircularProgressIndicator(
@@ -290,7 +294,7 @@ fun SettingsScreen(
                             )
                         } else {
                             Text(
-                                text = "CHECK",
+                                text = if (hasDownloadedApk) "INSTALL" else "CHECK",
                                 color = PureBlack,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
