@@ -34,17 +34,20 @@ fun MainScreen(
     onOpenChat: (String) -> Unit,
     onNeedsProfile: () -> Unit,
     onSignedOut: () -> Unit,
+    onEditProfile: (String, String) -> Unit = { _, _ -> },
     conversationsVm: ConversationsViewModel = viewModel(factory = AppViewModelFactory.Factory),
 ) {
     var selectedTab by remember { mutableStateOf(NavTab.CHATS) }
     val convState by conversationsVm.state.collectAsStateWithLifecycle()
 
-    val activeChatCount = remember(convState.chats) {
-        convState.chats.size
+    val totalUnreadCount = remember(convState.chats) {
+        convState.chats.sumOf { chat ->
+            conversationsVm.myUid?.let { uid -> chat.unreadCount[uid] } ?: 0
+        }
     }
 
     val currentUser = FirebaseAuth.getInstance().currentUser
-    val displayName = currentUser?.displayName ?: "Transmitter"
+    val displayName = currentUser?.displayName ?: "User"
     val email = currentUser?.email ?: ""
     val uid = currentUser?.uid ?: ""
 
@@ -55,7 +58,6 @@ fun MainScreen(
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        // Dynamic Animated Content for Tabs
         AnimatedContent(
             targetState = selectedTab,
             transitionSpec = {
@@ -89,6 +91,7 @@ fun MainScreen(
                             conversationsVm.signOut()
                             onSignedOut()
                         },
+                        onEditProfile = onEditProfile,
                     )
                 }
 
@@ -101,16 +104,17 @@ fun MainScreen(
                             conversationsVm.signOut()
                             onSignedOut()
                         },
+                        onEditProfile = onEditProfile,
                     )
                 }
             }
         }
 
-        // Dynamic Floating Pill Navbar with animations
         DynamicFloatingNavBar(
             selectedTab = selectedTab,
             onTabSelected = { selectedTab = it },
-            badgeCount = activeChatCount,
+            badgeCount = totalUnreadCount,
+            profileInitials = displayName.ifBlank { email }.trim().take(1).uppercase(),
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }

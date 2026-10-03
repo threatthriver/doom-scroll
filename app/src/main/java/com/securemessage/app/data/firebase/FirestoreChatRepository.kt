@@ -1,6 +1,7 @@
 package com.securemessage.app.data.firebase
 
 import android.util.Log
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
 import com.google.firebase.firestore.FieldValue
@@ -69,22 +70,96 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
     override suspend fun sendMessage(chatId: String, senderId: String, text: String): Result<Unit> = runCatching {
         val chatRef = chats.document(chatId)
         val batch = db.batch()
+        val msgRef = chatRef.collection("messages").document()
         batch.set(
-            chatRef.collection("messages").document(),
-            mapOf("text" to text, "senderId" to senderId, "timestamp" to FieldValue.serverTimestamp()),
+            msgRef,
+            mapOf(
+                "text" to text,
+                "senderId" to senderId,
+                "timestamp" to FieldValue.serverTimestamp(),
+                "reactions" to emptyMap<String, String>(),
+            ),
         )
-        batch.update(chatRef, mapOf("lastMessage" to text, "lastMessageAt" to FieldValue.serverTimestamp()))
+        // Increment unread count for other participants
+        val chat = chatRef.get().await()
+        val participants = chat.get("participants") as? List<*> ?: emptyList<String>()
+        val unreadUpdates = participants.filter { it != senderId }.associate { it.toString() to FieldValue.increment(1) }
+        batch.update(chatRef, mapOf(
+            "lastMessage" to text,
+            "lastMessageAt" to FieldValue.serverTimestamp(),
+            "unreadCount" to unreadUpdates,
+        ))
         batch.commit().await()
         Unit
     }.onFailure { Log.w(TAG, "sendMessage failed", it) }
 
-    @Suppress("UNCHECKED_CAST")
+    override suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit> = runCatching {
+        chats.document(chatId).collection("messages").document(messageId).delete().await()
+        Unit
+    }.onFailure { Log.w(TAG, "deleteMessage failed", it) }
+
+    override suspend fun addReaction(chatId: String, messageId: String, userId: String, emoji: String): Result<Unit> = runCatching {
+        val msgRef = chats.document(chatId).collection("messages").document(messageId)
+        msgRef.update("reactions.$userId", emoji).await()
+        Unit
+    }.onFailure { Log.w(TAG, "addReaction failed", it) }
+
+    override suspend fun removeReaction(chatId: String, messageId: String, userId: String): Result<Unit> = runCatching {
+        val msgRef = chats.document(chatId).collection("messages").document(messageId)
+        msgRef.update("reactions.$userId", FieldValue.delete()).await()
+        Unit
+    }.onFailure { Log.w(TAG, "removeReaction failed", it) }
+
+    override suspend fun markChatRead(chatId: String, userId: String): Result<Unit> = runCatching {
+        chats.document(chatId).update("unreadCount.$userId", 0).await()
+        Unit
+    }.onFailure { Log.w(TAG, "markChatRead failed", it) }
+
+    override suspend fun toggleMute(chatId: String, userId: String): Result<Unit> = runCatching {
+        val chatRef = chats.document(chatId)
+        val chat = chatRef.get().await()
+        val current = chat.get("muted") as? Map<*, *>
+        val isMuted = current?.get(userId) as? Boolean ?: false
+        chatRef.update("muted.$userId", !isMuted).await()
+        Unit
+    }.onFailure { Log.w(TAG, "toggleMute failed", it) }
+
+    override suspend fun togglePin(chatId: String, userId: String): Result<Unit> = runCatching {
+        val chatRef = chats.document(chatId)
+        val chat = chatRef.get().await()
+        val current = chat.get("pinned") as? Boolean ?: false
+        chatRef.update("pinned", !current).await()
+        Unit
+    }.onFailure { Log.w(TAG, "togglePin failed", it) }
+
+    override suspend fun toggleArchive(chatId: String, userId: String): Result<Unit> = runCatching {
+        val chatRef = chats.document(chatId)
+        val chat = chatRef.get().await()
+        val current = chat.get("archived") as? Map<*, *>
+        val isArchived = current?.get(userId) as? Boolean ?: false
+        chatRef.update("archived.$userId", !isArchived).await()
+        Unit
+    }.onFailure { Log.w(TAG, "toggleArchive failed", it) }
+
+    override suspend fun loadMoreMessages(chatId: String, beforeTimestamp: Timestamp, limit: Int): Result<List<Message>> = runCatching {
+        chats.document(chatId).collection("messages")
+            .orderBy("timestamp")
+            .endBefore(beforeTimestamp)
+            .limit(limit.toLong())
+            .get().await()
+            .documents.map { it.toMessage() }
+    }.onFailure { Log.w(TAG, "loadMoreMessages failed", it) }
+
     private fun DocumentSnapshot.toChat() = Chat(
         id = id,
-        participants = (get("participants") as? List<String>).orEmpty(),
-        participantNames = (get("participantNames") as? Map<String, String>).orEmpty(),
+        participants = FirestoreCoerce.stringList(get("participants")),
+        participantNames = FirestoreCoerce.stringMap(get("participantNames")),
         lastMessage = getString("lastMessage").orEmpty(),
         lastMessageAt = getTimestamp("lastMessageAt", ServerTimestampBehavior.ESTIMATE),
+        unreadCount = FirestoreCoerce.intMap(get("unreadCount")),
+        muted = FirestoreCoerce.booleanMap(get("muted")),
+        pinned = FirestoreCoerce.bool(get("pinned")),
+        archived = FirestoreCoerce.booleanMap(get("archived")),
     )
 
     private fun DocumentSnapshot.toMessage() = Message(
@@ -92,6 +167,7 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         text = getString("text").orEmpty(),
         senderId = getString("senderId").orEmpty(),
         timestamp = getTimestamp("timestamp", ServerTimestampBehavior.ESTIMATE),
+        reactions = FirestoreCoerce.stringMap(get("reactions")),
     )
 
     private companion object {

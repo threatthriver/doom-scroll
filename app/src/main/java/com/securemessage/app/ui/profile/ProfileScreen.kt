@@ -78,12 +78,16 @@ fun ProfileScreen(
     email: String = "",
     uid: String = "",
     onSignOut: () -> Unit,
+    onEditProfile: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     vm: ProfileViewModel = viewModel(factory = AppViewModelFactory.Factory),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var showSignOutConfirm by remember { mutableStateOf(false) }
-    var selectedProfileTab by remember { mutableIntStateOf(0) } // 0: Posts/Transmissions, 1: Archived
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editDisplayName by remember { mutableStateOf("") }
+    var editBio by remember { mutableStateOf("") }
+    var selectedProfileTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val snackbar = remember { SnackbarHostState() }
@@ -95,9 +99,10 @@ fun ProfileScreen(
         }
     }
 
-    val effectiveName = state.displayName.ifEmpty { displayName.ifEmpty { "Transmitter" } }
+    val effectiveName = state.displayName.ifEmpty { displayName.ifEmpty { "User" } }
     val effectiveEmail = state.email.ifEmpty { email.ifEmpty { "node@doomscroll.sec" } }
     val effectiveUid = state.uid.ifEmpty { uid }
+    val effectiveBio = state.bio
 
     val initials = effectiveName.split(" ")
         .mapNotNull { it.firstOrNull()?.toString() }
@@ -125,12 +130,11 @@ fun ProfileScreen(
         ) {
             Spacer(Modifier.height(20.dp))
 
-            // Telegram Profile Avatar with Camera action
+            // Profile Avatar with Camera action
             Box(contentAlignment = Alignment.BottomEnd) {
                 MonochromeAvatar(
                     initials = initials,
                     size = 96.dp,
-                    showOnlineBadge = true,
                 )
                 Box(
                     modifier = Modifier
@@ -140,7 +144,7 @@ fun ProfileScreen(
                         .border(2.dp, ObsidianVoid, CircleShape)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            Toast.makeText(context, "Photo picker ready", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Photo upload coming soon", Toast.LENGTH_SHORT).show()
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -175,7 +179,7 @@ fun ProfileScreen(
                         .background(PureWhite),
                 )
                 Text(
-                    text = "online // encrypted session active",
+                    text = "signed in",
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = TextMuted,
@@ -184,7 +188,7 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(18.dp))
 
-            // Telegram 3 Action Buttons: Set Photo | Edit Info | Settings
+            // Action Buttons: Set Photo | Edit Info | Settings
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -195,7 +199,7 @@ fun ProfileScreen(
                     modifier = Modifier.weight(1f),
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "Upload photo", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Photo upload coming soon", Toast.LENGTH_SHORT).show()
                     },
                 )
                 TelegramActionPill(
@@ -203,8 +207,9 @@ fun ProfileScreen(
                     label = "Edit Info",
                     modifier = Modifier.weight(1f),
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "Edit bio & username", Toast.LENGTH_SHORT).show()
+                        editDisplayName = effectiveName
+                        editBio = effectiveBio
+                        showEditDialog = true
                     },
                 )
                 TelegramActionPill(
@@ -219,7 +224,7 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Telegram Info Card (Email/Mobile, Username, Fingerprint)
+            // Info Card
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -238,7 +243,7 @@ fun ProfileScreen(
                             color = PureWhite,
                         )
                         Text(
-                            text = "Authenticated Node ID",
+                            text = "User ID",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = TextMuted,
@@ -266,7 +271,25 @@ fun ProfileScreen(
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
                     }
 
-                    // Cryptographic Fingerprint
+                    // Bio
+                    if (effectiveBio.isNotEmpty()) {
+                        Column {
+                            Text(
+                                text = effectiveBio,
+                                fontSize = 13.sp,
+                                color = TextSecondary,
+                            )
+                            Text(
+                                text = "Bio",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = TextMuted,
+                            )
+                        }
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                    }
+
+                    // Fingerprint
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -281,7 +304,7 @@ fun ProfileScreen(
                                 color = PureWhite,
                             )
                             Text(
-                                text = "Hardware Key Fingerprint (Tap to copy)",
+                                text = "Security code (tap to copy)",
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 color = TextMuted,
@@ -307,7 +330,7 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Telegram Segmented Control: Posts | Archived Posts
+            // Segmented Control
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
@@ -323,7 +346,7 @@ fun ProfileScreen(
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "Transmissions",
+                        text = "Chats",
                         color = if (selectedProfileTab == 0) PureBlack else TextMuted,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -338,7 +361,7 @@ fun ProfileScreen(
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "Archived Vault",
+                        text = "Archived chats",
                         color = if (selectedProfileTab == 1) PureBlack else TextMuted,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -349,20 +372,20 @@ fun ProfileScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // Telegram Empty State / Feed
+            // Empty State
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(vertical = 12.dp),
             ) {
                 Text(
-                    text = if (selectedProfileTab == 0) "No active broadcasts yet..." else "Encrypted vault is empty",
+                    text = if (selectedProfileTab == 0) "Nothing here yet" else "Nothing archived yet",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = PureWhite,
                 )
                 Text(
-                    text = "Encrypted transmissions and media will be archived here.",
+                    text = "Archived chats and media will appear here.",
                     fontSize = 12.sp,
                     color = TextMuted,
                 )
@@ -370,7 +393,7 @@ fun ProfileScreen(
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "New Transmission prompt", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = PureWhite,
@@ -385,7 +408,7 @@ fun ProfileScreen(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "New Transmission",
+                        text = "New Chat",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                     )
@@ -421,7 +444,7 @@ fun ProfileScreen(
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        text = "TERMINATE SESSION // SIGN OUT",
+                        text = "Sign out",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
@@ -430,7 +453,6 @@ fun ProfileScreen(
                 }
             }
 
-            // Clearance for dynamic floating navbar
             Spacer(Modifier.height(130.dp))
         }
 
@@ -442,6 +464,98 @@ fun ProfileScreen(
         )
     }
 
+    // Edit Profile Dialog
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            containerColor = ObsidianCard,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = "Edit profile",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = PureWhite,
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = editDisplayName,
+                        onValueChange = { editDisplayName = it },
+                        label = { Text("Display Name", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PureWhite,
+                            unfocusedBorderColor = HairlineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedLabelColor = PureWhite,
+                            unfocusedLabelColor = TextMuted,
+                            cursorColor = PureWhite,
+                            focusedContainerColor = ObsidianCard,
+                            unfocusedContainerColor = ObsidianCard,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = editBio,
+                        onValueChange = { editBio = it },
+                        label = { Text("Bio", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                        maxLines = 3,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = PureWhite,
+                            unfocusedBorderColor = HairlineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedLabelColor = PureWhite,
+                            unfocusedLabelColor = TextMuted,
+                            cursorColor = PureWhite,
+                            focusedContainerColor = ObsidianCard,
+                            unfocusedContainerColor = ObsidianCard,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showEditDialog = false
+                        onEditProfile(editDisplayName, editBio)
+                        Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PureWhite,
+                        contentColor = PureBlack,
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        text = "Save",
+                        color = PureBlack,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text(
+                        text = "Cancel",
+                        color = TextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                    )
+                }
+            },
+        )
+    }
+
     if (showSignOutConfirm) {
         AlertDialog(
             onDismissRequest = { showSignOutConfirm = false },
@@ -449,7 +563,7 @@ fun ProfileScreen(
             shape = RoundedCornerShape(16.dp),
             title = {
                 Text(
-                    text = "DISCONNECT NODE?",
+                    text = "Sign out?",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
@@ -458,7 +572,7 @@ fun ProfileScreen(
             },
             text = {
                 Text(
-                    text = "You will be signed out of this secure transmitter device.",
+                    text = "You will be signed out of this device.",
                     fontSize = 13.sp,
                     color = TextSecondary,
                 )
@@ -477,7 +591,7 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(
-                        text = "SIGN OUT",
+                        text = "Sign out",
                         color = PureBlack,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
@@ -488,7 +602,7 @@ fun ProfileScreen(
             dismissButton = {
                 TextButton(onClick = { showSignOutConfirm = false }) {
                     Text(
-                        text = "CANCEL",
+                        text = "Cancel",
                         color = TextSecondary,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,

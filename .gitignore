@@ -9,3 +9,19 @@ local.properties
 .agents/
 telegram_exploration/
 *.apk
+
+# Firebase config — contains project-specific API keys/IDs. Keep out of version control.
+# Each developer should drop their own app/google-services.json locally (see the template).
+app/google-services.json
+# Service-account keys / credentials must NEVER be committed.
+*.jks
+*.keystore
+*-service-account*.json
+serviceAccountKey*.json
+*.p12
+*.pem
+# Environment / secrets
+.env
+.env.*
+!.env.example
+secrets/

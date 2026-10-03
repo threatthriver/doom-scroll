@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -26,25 +25,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.securemessage.app.ui.theme.HairlineBorder
-import com.securemessage.app.ui.theme.ObsidianSurfaceElevated
-import com.securemessage.app.ui.theme.PureBlack
-import com.securemessage.app.ui.theme.PureWhite
+import com.securemessage.app.ui.theme.ObsidianCardHover
+import com.securemessage.app.ui.theme.TgBlue
+import com.securemessage.app.ui.theme.TgOnline
 import com.securemessage.app.ui.theme.TextMuted
 import com.securemessage.app.ui.theme.TextPrimary
-import com.securemessage.app.ui.theme.TextSecondary
 
-/**
- * Stark high-contrast Monochromatic Avatar with pure white background and bold black initials.
- */
+/** Deterministic Telegram-style avatar colour derived from the title. */
+fun avatarColorFor(title: String): Color {
+    val palette = listOf(
+        Color(0xFFE17076), Color(0xFF7BC862), Color(0xFFE5CA77), Color(0xFF65AADD),
+        Color(0xFFA695E7), Color(0xFFEE7AAE), Color(0xFF6EC9CB), Color(0xFFFA7F77),
+        Color(0xFF77BEAE), Color(0xFF9A9AC7),
+    )
+    val key = title.trim().lowercase()
+    if (key.isEmpty()) return palette[0]
+    return palette[(key.sumOf { it.code } + key.length) % palette.size]
+}
+
+/** Circular avatar with bold initials, matching Telegram's list avatars. */
 @Composable
 fun MonochromeAvatar(
     initials: String,
@@ -52,8 +59,10 @@ fun MonochromeAvatar(
     showOnlineBadge: Boolean = false,
     inverted: Boolean = false,
     modifier: Modifier = Modifier,
+    color: Color? = null,
 ) {
     val cleanInitials = initials.trim().take(2).uppercase().ifEmpty { "?" }
+    val fill = color ?: if (inverted) Color(0xFF2E455A) else avatarColorFor(initials)
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center,
@@ -62,38 +71,33 @@ fun MonochromeAvatar(
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(if (inverted) PureBlack else PureWhite)
-                .border(1.dp, if (inverted) HairlineBorder else PureBlack, CircleShape),
+                .background(fill),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = cleanInitials,
-                color = if (inverted) PureWhite else PureBlack,
-                fontWeight = FontWeight.Black,
-                fontSize = (size.value * 0.4f).sp,
-                fontFamily = FontFamily.SansSerif,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = (size.value * 0.38f).sp,
                 letterSpacing = (-0.5).sp,
             )
         }
         if (showOnlineBadge) {
             Box(
                 modifier = Modifier
-                    .size(11.dp)
+                    .size(size * 0.28f)
                     .align(Alignment.BottomEnd)
                     .clip(CircleShape)
-                    .background(PureBlack)
-                    .border(1.5.dp, HairlineBorder, CircleShape)
+                    .background(ObsidianCardHover)
                     .padding(2.dp)
                     .clip(CircleShape)
-                    .background(PureWhite),
+                    .background(TgOnline),
             )
         }
     }
 }
 
-/**
- * High-contrast stark white pill badge for unread counts and status tokens.
- */
+/** Blue circular unread badge. */
 @Composable
 fun MonochromePillBadge(
     text: String,
@@ -101,30 +105,26 @@ fun MonochromePillBadge(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(9999.dp))
-            .background(PureWhite)
-            .padding(horizontal = 8.dp, vertical = 2.dp),
+            .clip(CircleShape)
+            .background(TgBlue)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
-            color = PureBlack,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 0.5.sp,
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
         )
     }
 }
 
-/**
- * Sleek monochromatic inline search input field.
- */
+/** Telegram flat rounded search pill — no border, filled surface. */
 @Composable
 fun MonochromeSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    placeholder: String = "SEARCH TRANSMISSIONS...",
+    placeholder: String = "Search Chats",
     onClear: () -> Unit = { onQueryChange("") },
     onSearch: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -132,44 +132,37 @@ fun MonochromeSearchBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(ObsidianSurfaceElevated)
-            .border(1.dp, HairlineBorder, RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp),
+            .height(46.dp)
+            .clip(RoundedCornerShape(23.dp))
+            .background(ObsidianCardHover)
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Filled.Search,
             contentDescription = "Search",
             tint = TextMuted,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(20.dp),
         )
         Box(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 10.dp),
+                .padding(start = 12.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (query.isEmpty()) {
                 Text(
                     text = placeholder,
                     color = TextMuted,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 0.8.sp,
+                    fontSize = 15.sp,
                 )
             }
             BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
-                textStyle = TextStyle(
-                    color = TextPrimary,
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.SansSerif,
-                ),
-                cursorBrush = SolidColor(PureWhite),
+                textStyle = TextStyle(color = TextPrimary, fontSize = 15.sp),
+                cursorBrush = SolidColor(TgBlue),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 modifier = Modifier.fillMaxWidth(),
@@ -180,14 +173,15 @@ fun MonochromeSearchBar(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
+                    .background(ObsidianCardHover)
                     .clickable(onClick = onClear),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
                     contentDescription = "Clear",
-                    tint = TextSecondary,
-                    modifier = Modifier.size(16.dp),
+                    tint = TextPrimary,
+                    modifier = Modifier.size(14.dp),
                 )
             }
         }

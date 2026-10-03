@@ -120,7 +120,7 @@ fun UserSearchScreen(
                 }
                 Column {
                     Text(
-                        text = "NETWORK DIRECTORY",
+                        text = "FIND PEOPLE",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
@@ -144,7 +144,7 @@ fun UserSearchScreen(
             MonochromeSearchBar(
                 query = state.query,
                 onQueryChange = vm::onQueryChange,
-                placeholder = "Search people by username...",
+                placeholder = "Search by username or email",
                 onClear = { vm.onQueryChange("") },
             )
 
@@ -195,17 +195,16 @@ fun UserSearchScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Text(
-                                text = "NO NODES LOCATED",
+                                text = "No one found",
                                 color = PureWhite,
-                                fontSize = 14.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "Verify the exact email or username prefix.",
+                                text = "Check the spelling and try again.",
                                 color = TextMuted,
-                                fontSize = 12.sp,
+                                fontSize = 14.sp,
                             )
                         }
                     }
@@ -234,18 +233,16 @@ fun UserSearchScreen(
                             }
                             Spacer(Modifier.height(16.dp))
                             Text(
-                                text = "GLOBAL DIRECTORY ACTIVE",
+                                text = "Find someone to chat with",
                                 color = PureWhite,
-                                fontSize = 14.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 1.sp,
                             )
                             Spacer(Modifier.height(6.dp))
                             Text(
-                                text = "Type an email or handle above to discover encrypted peers.",
+                                text = "Type a username or email above.",
                                 color = TextMuted,
-                                fontSize = 12.sp,
+                                fontSize = 14.sp,
                             )
                         }
                     }
@@ -308,7 +305,6 @@ private fun UserSearchRow(
             MonochromeAvatar(
                 initials = initials,
                 size = 46.dp,
-                showOnlineBadge = true,
             )
 
             Column(modifier = Modifier.weight(1f)) {

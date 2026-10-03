@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,8 +28,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,12 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,17 +60,28 @@ import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.theme.HairlineBorder
 import com.securemessage.app.ui.theme.HairlineBorderSubtle
 import com.securemessage.app.ui.theme.ObsidianCard
-import com.securemessage.app.ui.theme.ObsidianSurfaceElevated
 import com.securemessage.app.ui.theme.ObsidianVoid
-import com.securemessage.app.ui.theme.PureBlack
 import com.securemessage.app.ui.theme.PureWhite
+import com.securemessage.app.ui.theme.SettingsIconBlue
+import com.securemessage.app.ui.theme.SettingsIconGreen
+import com.securemessage.app.ui.theme.SettingsIconIndigo
+import com.securemessage.app.ui.theme.SettingsIconOrange
+import com.securemessage.app.ui.theme.SettingsIconRed
 import com.securemessage.app.ui.theme.TextMuted
 import com.securemessage.app.ui.theme.TextPrimary
 import com.securemessage.app.ui.theme.TextSecondary
+import com.securemessage.app.ui.theme.TgBlue
+import com.securemessage.app.ui.theme.TgErrorRed
 
 @Composable
 fun SettingsScreen(
     onSignOut: () -> Unit,
+    onEditProfile: (String, String) -> Unit = { _, _ -> },
+    onNotificationSettings: () -> Unit = {},
+    onPrivacySettings: () -> Unit = {},
+    onChatSettings: () -> Unit = {},
+    onStorageSettings: () -> Unit = {},
+    onFolderSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
     vm: ProfileViewModel = viewModel(factory = AppViewModelFactory.Factory),
 ) {
@@ -88,7 +98,7 @@ fun SettingsScreen(
         }
     }
 
-    val displayName = state.displayName.ifEmpty { "Transmitter" }
+    val displayName = state.displayName.ifEmpty { "User" }
     val initials = displayName.split(" ")
         .mapNotNull { it.firstOrNull()?.toString() }
         .take(2)
@@ -108,7 +118,7 @@ fun SettingsScreen(
         ) {
             Spacer(Modifier.height(16.dp))
 
-            // Telegram Settings Top Profile Summary Header
+            // Profile summary
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -118,7 +128,6 @@ fun SettingsScreen(
                 MonochromeAvatar(
                     initials = initials,
                     size = 80.dp,
-                    showOnlineBadge = true,
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
@@ -130,30 +139,20 @@ fun SettingsScreen(
                 if (state.username.isNotEmpty()) {
                     Text(
                         text = "@${state.username}",
-                        fontSize = 13.sp,
-                        fontFamily = FontFamily.Monospace,
+                        fontSize = 14.sp,
                         color = TextMuted,
                     )
                 }
                 Text(
-                    text = state.email.ifEmpty { "Active Cryptographic Node" },
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
+                    text = state.email,
+                    fontSize = 13.sp,
                     color = TextSecondary,
                 )
             }
 
             Spacer(Modifier.height(16.dp))
 
-            // Telegram Settings Group 1: Account & Chat Settings
-            Text(
-                text = "SETTINGS // PREFERENCES",
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                letterSpacing = 1.2.sp,
-            )
+            SectionTitle("Settings")
             Spacer(Modifier.height(8.dp))
 
             Box(
@@ -167,59 +166,78 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Filled.Person,
                         title = "Account",
-                        subtitle = "Username, email, cryptographic bio",
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+                        subtitle = "Name, username and bio",
+                        iconColor = SettingsIconBlue,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onEditProfile(state.displayName, state.bio)
+                        },
                     )
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                    RowDivider()
                     SettingsRow(
                         icon = Icons.Filled.Palette,
                         title = "Chat Settings",
-                        subtitle = "Monochromatic theme, brutalist bubble styles",
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+                        subtitle = "Theme and how chats look",
+                        iconColor = SettingsIconOrange,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onChatSettings()
+                        },
                     )
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                    RowDivider()
                     SettingsRow(
                         icon = Icons.Filled.Lock,
                         title = "Privacy & Security",
-                        subtitle = "End-to-end encryption, secret chat protocols",
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+                        subtitle = "Who can see your info",
+                        iconColor = SettingsIconGreen,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onPrivacySettings()
+                        },
                     )
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                    RowDivider()
                     SettingsRow(
                         icon = Icons.Filled.Notifications,
-                        title = "Notifications & Sounds",
-                        subtitle = "Haptic alerts, message banners",
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+                        title = "Notifications",
+                        subtitle = "Sounds and alerts",
+                        iconColor = SettingsIconRed,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onNotificationSettings()
+                        },
                     )
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                    RowDivider()
                     SettingsRow(
                         icon = Icons.Filled.Storage,
                         title = "Data and Storage",
-                        subtitle = "Encrypted local cache, automatic downloads",
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+                        subtitle = "Storage and downloads",
+                        iconColor = SettingsIconIndigo,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onStorageSettings()
+                        },
                     )
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                    RowDivider()
                     SettingsRow(
                         icon = Icons.Filled.Folder,
                         title = "Chat Folders",
-                        subtitle = "Sort transmissions into folders",
-                        onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
+                        subtitle = "Sort chats into folders",
+                        iconColor = SettingsIconBlue,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onFolderSettings()
+                        },
                     )
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(22.dp))
 
-            // Telegram Settings Group 2: GitHub Auto-Update System
-            Text(
-                text = "UPDATES // REPOSITORY TELEMETRY",
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = TextMuted,
-                letterSpacing = 1.2.sp,
-            )
+            SectionTitle("App updates")
             Spacer(Modifier.height(8.dp))
+
+            val apkFile = state.downloadedApkFile
+            val hasDownloadedApk = apkFile != null && apkFile.exists()
 
             Box(
                 modifier = Modifier
@@ -229,95 +247,140 @@ fun SettingsScreen(
                     .border(1.dp, HairlineBorder, RoundedCornerShape(16.dp))
                     .padding(16.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(ObsidianVoid)
-                                .border(1.dp, HairlineBorder, CircleShape),
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(SettingsIconBlue),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.SystemUpdate,
-                                contentDescription = "Auto Update",
-                                tint = PureWhite,
-                                modifier = Modifier.size(20.dp),
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp),
                             )
                         }
-                        Column {
+
+                        // weight(1f) is what keeps the button from being squeezed
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "App Updates (GitHub)",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
+                                text = "Doom Scroll updates",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 color = PureWhite,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                text = "Installed: v${state.currentVersion} • threatthriver/doom-scroll",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = TextMuted,
+                                text = when {
+                                    state.updateAvailable -> "New version ${state.updateVersion} is ready"
+                                    else -> "You have version ${state.currentVersion}"
+                                },
+                                fontSize = 13.sp,
+                                color = if (state.updateAvailable) TgBlue else TextMuted,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
+                        }
+
+                        val buttonLabel = when {
+                            hasDownloadedApk -> "Install"
+                            state.updateAvailable -> "Update"
+                            else -> "Check"
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (state.updateAvailable || hasDownloadedApk) TgBlue else PureWhite)
+                                .clickable(enabled = !state.isCheckingUpdates && !state.isDownloadingUpdate) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    when {
+                                        hasDownloadedApk -> vm.installDownloadedApk(context)
+                                        state.updateAvailable -> vm.openUpdateDialog()
+                                        else -> vm.checkForUpdates(silent = false)
+                                    }
+                                }
+                                .heightIn(min = 38.dp)
+                                .padding(horizontal = 18.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (state.isCheckingUpdates) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = Color.Black,
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text(
+                                    text = buttonLabel,
+                                    color = if (state.updateAvailable || hasDownloadedApk) Color.White else Color.Black,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
                         }
                     }
 
-                    val apkFile = state.downloadedApkFile
-                    val hasDownloadedApk = apkFile != null && apkFile.exists()
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(PureWhite)
-                            .clickable(enabled = !state.isCheckingUpdates) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                if (hasDownloadedApk) {
-                                    vm.installDownloadedApk(context)
-                                } else {
-                                    vm.checkForUpdates(silent = false)
-                                }
-                            }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (state.isCheckingUpdates) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                color = PureBlack,
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text(
-                                text = if (hasDownloadedApk) "INSTALL" else "CHECK",
-                                color = PureBlack,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                            )
-                        }
+                    // Live download progress, visible even if the dialog was closed
+                    if (state.isDownloadingUpdate) {
+                        LinearProgressIndicator(
+                            progress = { state.downloadProgress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = TgBlue,
+                            trackColor = HairlineBorder,
+                        )
+                        Text(
+                            text = "Downloading... ${state.downloadedBytesText}",
+                            fontSize = 12.sp,
+                            color = TextMuted,
+                        )
                     }
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(22.dp))
 
-            // Sign Out
-            OutlinedButtonRow(
-                icon = Icons.AutoMirrored.Filled.Logout,
-                text = "SIGN OUT // TERMINATE SESSION",
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showSignOutConfirm = true
-                },
-            )
+            // Sign out
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(ObsidianCard)
+                    .border(1.dp, HairlineBorder, RoundedCornerShape(16.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showSignOutConfirm = true
+                    }
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = null,
+                    tint = TgErrorRed,
+                    modifier = Modifier.size(22.dp),
+                )
+                Text(
+                    text = "Sign out",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TgErrorRed,
+                )
+            }
 
-            // Clearance for dynamic floating navbar
             Spacer(Modifier.height(130.dp))
         }
 
@@ -325,102 +388,110 @@ fun SettingsScreen(
             hostState = snackbar,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 90.dp),
+                .padding(bottom = 100.dp),
         )
     }
 
-    // In-App Update Modal
+    // Update dialog: opens only when the user asks (tapping "Check" or "Update")
     if (state.showUpdateDialog) {
         AlertDialog(
-            onDismissRequest = { if (!state.isDownloadingUpdate) vm.dismissUpdateDialog() },
+            onDismissRequest = { vm.dismissUpdateDialog() },
             containerColor = ObsidianCard,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(24.dp),
             title = {
                 Text(
-                    text = "SYSTEM UPDATE AVAILABLE",
-                    fontFamily = FontFamily.Monospace,
+                    text = "New version available",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
+                    fontSize = 20.sp,
                     color = PureWhite,
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "PROTOCOL ${state.updateVersion}",
-                            fontFamily = FontFamily.Monospace,
-                            color = PureWhite,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = "Version ${state.updateVersion}",
+                            color = TgBlue,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
                         if (state.apkSizeMb.isNotEmpty()) {
                             Text(
                                 text = state.apkSizeMb,
-                                fontFamily = FontFamily.Monospace,
                                 color = TextMuted,
-                                fontSize = 11.sp,
+                                fontSize = 13.sp,
                             )
                         }
                     }
                     if (state.updateNotes.isNotEmpty()) {
                         Text(
+                            text = "What's new",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary,
+                        )
+                        Text(
                             text = state.updateNotes,
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
                             color = TextSecondary,
-                            lineHeight = 17.sp,
+                            lineHeight = 20.sp,
+                            modifier = Modifier
+                                .heightIn(max = 260.dp)
+                                .verticalScroll(rememberScrollState()),
                         )
                     }
                     if (state.isDownloadingUpdate) {
-                        Spacer(Modifier.height(6.dp))
                         LinearProgressIndicator(
                             progress = { state.downloadProgress },
-                            modifier = Modifier.fillMaxWidth().height(4.dp),
-                            color = PureWhite,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = TgBlue,
                             trackColor = HairlineBorder,
                         )
                         Text(
-                            text = state.downloadedBytesText.ifEmpty { "DOWNLOADING: ${(state.downloadProgress * 100).toInt()}%" },
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
+                            text = state.downloadedBytesText.ifEmpty { "Downloading..." },
+                            fontSize = 12.sp,
                             color = TextMuted,
                         )
                     }
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = { vm.startUpdateDownload(context) },
-                    enabled = !state.isDownloadingUpdate,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PureWhite,
-                        contentColor = PureBlack,
-                    ),
-                    shape = RoundedCornerShape(8.dp),
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (state.isDownloadingUpdate) HairlineBorder else TgBlue)
+                        .clickable(enabled = !state.isDownloadingUpdate) {
+                            vm.startUpdateDownload(context)
+                        }
+                        .heightIn(min = 40.dp)
+                        .padding(horizontal = 20.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = if (state.isDownloadingUpdate) "DOWNLOADING..." else "DOWNLOAD & INSTALL",
-                        color = PureBlack,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
+                        text = if (state.isDownloadingUpdate) "Downloading..." else "Download and install",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                 }
             },
             dismissButton = {
-                if (!state.isDownloadingUpdate) {
-                    TextButton(onClick = vm::dismissUpdateDialog) {
-                        Text(
-                            text = "LATER",
-                            color = TextMuted,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                        )
-                    }
+                TextButton(onClick = vm::dismissUpdateDialog) {
+                    Text(
+                        text = if (state.isDownloadingUpdate) "Hide" else "Later",
+                        color = TextSecondary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
             },
         )
@@ -430,52 +501,44 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showSignOutConfirm = false },
             containerColor = ObsidianCard,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(24.dp),
             title = {
                 Text(
-                    text = "SIGN OUT?",
-                    fontFamily = FontFamily.Monospace,
+                    text = "Sign out?",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
+                    fontSize = 20.sp,
                     color = PureWhite,
                 )
             },
             text = {
                 Text(
-                    text = "You will be disconnected from this encrypted node session.",
-                    fontSize = 13.sp,
+                    text = "You will be signed out of this phone.",
+                    fontSize = 15.sp,
                     color = TextSecondary,
                 )
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
                         showSignOutConfirm = false
                         vm.signOut()
                         onSignOut()
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PureWhite,
-                        contentColor = PureBlack,
-                    ),
-                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(
-                        text = "SIGN OUT",
-                        color = PureBlack,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
+                        text = "Sign out",
+                        color = TgErrorRed,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
                     )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutConfirm = false }) {
                     Text(
-                        text = "CANCEL",
+                        text = "Cancel",
                         color = TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
+                        fontSize = 15.sp,
                     )
                 }
             },
@@ -484,10 +547,33 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = TgBlue,
+        modifier = Modifier.padding(start = 4.dp),
+    )
+}
+
+@Composable
+private fun RowDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 68.dp)
+            .height(1.dp)
+            .background(HairlineBorderSubtle),
+    )
+}
+
+@Composable
 private fun SettingsRow(
     icon: ImageVector,
     title: String,
     subtitle: String,
+    iconColor: Color,
     onClick: () -> Unit,
 ) {
     Row(
@@ -498,31 +584,31 @@ private fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // Telegram-style coloured rounded-square icon tile
         Box(
             modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(ObsidianVoid)
-                .border(1.dp, HairlineBorder, CircleShape),
+                .size(38.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(iconColor),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = PureWhite,
-                modifier = Modifier.size(18.dp),
+                tint = Color.White,
+                modifier = Modifier.size(22.dp),
             )
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                fontSize = 14.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = PureWhite,
             )
             Text(
                 text = subtitle,
-                fontSize = 11.sp,
+                fontSize = 13.sp,
                 color = TextMuted,
             )
         }
@@ -532,44 +618,5 @@ private fun SettingsRow(
             tint = TextMuted,
             modifier = Modifier.size(18.dp),
         )
-    }
-}
-
-@Composable
-private fun OutlinedButtonRow(
-    icon: ImageVector,
-    text: String,
-    onClick: () -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = ObsidianCard,
-            contentColor = PureWhite,
-        ),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = PureWhite,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = text,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp,
-            )
-        }
     }
 }

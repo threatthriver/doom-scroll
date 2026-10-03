@@ -104,7 +104,7 @@ class AuthViewModel(
                 _state.update { it.copy(isLoading = false, error = e.message()) }
                 return@launch
             }
-            val user = User(uid, normalizeUsername(s.username), s.displayName.trim(), email.lowercase())
+            val user = User(uid, normalizeUsername(s.username), s.displayName.trim())
             userRepo.createProfile(user)
                 .onSuccess { _state.update { it.copy(isLoading = false, isAuthenticated = true) } }
                 .onFailure { e ->
@@ -119,10 +119,9 @@ class AuthViewModel(
         if (s.isLoading) return
         profileError(s)?.let { return failWith(it) }
         val uid = authRepo.currentUserId ?: return failWith("You're signed out. Sign in again.")
-        val email = authRepo.currentEmail.orEmpty().lowercase()
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            userRepo.createProfile(User(uid, normalizeUsername(s.username), s.displayName.trim(), email))
+            userRepo.createProfile(User(uid, normalizeUsername(s.username), s.displayName.trim()))
                 .onSuccess { _state.update { it.copy(isLoading = false, isAuthenticated = true) } }
                 .onFailure { e ->
                     val msg = if (e is UsernameTakenException) MSG_USERNAME_TAKEN else MSG_PROFILE_FAILED

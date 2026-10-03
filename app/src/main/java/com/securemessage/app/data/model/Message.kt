@@ -7,4 +7,5 @@ data class Message(
     val text: String = "",
     val senderId: String = "",
     val timestamp: Timestamp? = null,
+    val reactions: Map<String, String> = emptyMap(), // userId -> emoji
 )

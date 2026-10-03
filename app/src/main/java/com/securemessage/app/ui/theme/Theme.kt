@@ -4,49 +4,49 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
-private val MonochromeDarkColors = darkColorScheme(
-    primary = PureWhite,
-    onPrimary = PureBlack,
-    primaryContainer = PureWhite,
-    onPrimaryContainer = PureBlack,
-    inversePrimary = PureBlack,
-    secondary = TextSecondary,
+private val TelegramDarkColors = darkColorScheme(
+    primary = TgBlue,
+    onPrimary = PureWhite,
+    primaryContainer = TgBlue,
+    onPrimaryContainer = PureWhite,
+    inversePrimary = TgBlue,
+    secondary = TgBlueLight,
     onSecondary = PureBlack,
-    secondaryContainer = ObsidianCard,
+    secondaryContainer = ObsidianSurfaceElevated,
     onSecondaryContainer = PureWhite,
-    tertiary = TextMuted,
-    onTertiary = PureWhite,
+    tertiary = TgLink,
+    onTertiary = PureBlack,
     background = ObsidianVoid,
-    onBackground = PureWhite,
-    surface = ObsidianSurface,
-    onSurface = PureWhite,
-    surfaceDim = ObsidianVoid,
-    surfaceBright = ObsidianSurfaceElevated,
-    surfaceContainerLowest = ObsidianVoid,
-    surfaceContainerLow = ObsidianSurface,
+    onBackground = TextPrimary,
+    surface = ObsidianVoid,
+    onSurface = TextPrimary,
+    surfaceDim = ObsidianSurface,
+    surfaceBright = ObsidianCardHover,
+    surfaceContainerLowest = ObsidianSurface,
+    surfaceContainerLow = ObsidianVoid,
     surfaceContainer = ObsidianSurfaceElevated,
-    surfaceContainerHigh = ObsidianCard,
+    surfaceContainerHigh = ObsidianCardHover,
     surfaceContainerHighest = HairlineBorder,
-    surfaceVariant = ObsidianCard,
+    surfaceVariant = ObsidianSurfaceElevated,
     onSurfaceVariant = TextSecondary,
     inverseSurface = PureWhite,
     inverseOnSurface = PureBlack,
-    outline = HairlineBorder,
+    outline = HairlineBorderBright,
     outlineVariant = HairlineBorderSubtle,
-    error = PureWhite,
-    onError = PureBlack,
-    errorContainer = ObsidianCard,
+    error = TgErrorRed,
+    onError = PureWhite,
+    errorContainer = ObsidianCardHover,
     onErrorContainer = PureWhite,
 )
 
 @Composable
 fun SecureMessageTheme(
     darkTheme: Boolean = true,
-    dynamicColor: Boolean = false, // Strictly false to preserve pure black and white monochromatic theme
+    dynamicColor: Boolean = false, // Strictly false to preserve the Telegram dark palette
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
-        colorScheme = MonochromeDarkColors,
+        colorScheme = TelegramDarkColors,
         typography = AppTypography,
         content = content,
     )

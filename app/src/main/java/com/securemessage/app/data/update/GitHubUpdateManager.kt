@@ -42,7 +42,7 @@ object GitHubUpdateManager {
                 return@flow
             }
             if (responseCode !in 200..299) {
-                emit(UpdateState.Error("Failed to check updates (HTTP $responseCode)"))
+                emit(UpdateState.Error("Couldn't check for updates (error $responseCode)"))
                 return@flow
             }
 
@@ -105,6 +105,19 @@ object GitHubUpdateManager {
         if (!dir.exists()) dir.mkdirs()
         val sanitizedTag = release.tagName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
         val apkFile = File(dir, "doomscroll_update_$sanitizedTag.apk")
+        // Download into a ".part" file first, so a half-finished download is never installed.
+        val partFile = File(dir, apkFile.name + ".part")
+
+        // Remove old update files so they don't pile up on the phone.
+        dir.listFiles()
+            ?.filter { it.name.startsWith("doomscroll_update_") && it.name != apkFile.name }
+            ?.forEach { it.delete() }
+
+        // Already downloaded this exact version? Skip the download and go straight to install.
+        if (apkFile.exists() && release.apkSize > 0 && apkFile.length() == release.apkSize) {
+            emit(UpdateState.ReadyToInstall(release, apkFile))
+            return@flow
+        }
 
         try {
             var currentUrl = downloadUrl
@@ -139,32 +152,48 @@ object GitHubUpdateManager {
             }
 
             val conn = connection ?: throw IllegalStateException("Could not open download connection")
+            if (conn.responseCode !in 200..299) {
+                throw IllegalStateException("HTTP ${conn.responseCode}")
+            }
             val totalBytes = conn.contentLengthLong.let { if (it > 0) it else release.apkSize }
 
             var downloadedBytes = 0L
             val inputStream: InputStream = conn.inputStream
-            val outputStream = FileOutputStream(apkFile)
+            val outputStream = FileOutputStream(partFile)
 
             val buffer = ByteArray(8192)
             var bytesRead: Int
+            var lastEmitMs = 0L
 
             inputStream.use { input ->
                 outputStream.use { output ->
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
                         downloadedBytes += bytesRead
-                        val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
-                        emit(UpdateState.Downloading(release, progress, downloadedBytes, totalBytes))
+                        val now = System.currentTimeMillis()
+                        if (now - lastEmitMs >= 100) {
+                            lastEmitMs = now
+                            val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
+                            emit(UpdateState.Downloading(release, progress, downloadedBytes, totalBytes))
+                        }
                     }
                     output.flush()
                 }
             }
 
+            // Only a fully downloaded file becomes the real APK.
+            if (release.apkSize > 0 && partFile.length() != release.apkSize) {
+                throw IllegalStateException("File is incomplete, please try again")
+            }
+            if (apkFile.exists()) apkFile.delete()
+            if (!partFile.renameTo(apkFile)) {
+                throw IllegalStateException("Couldn't save the downloaded file")
+            }
+
             emit(UpdateState.ReadyToInstall(release, apkFile))
         } catch (e: Exception) {
-            if (apkFile.exists()) {
-                apkFile.delete()
-            }
+            partFile.delete()
+            apkFile.delete()
             emit(UpdateState.Error("Download failed: ${e.localizedMessage}"))
         }
     }.flowOn(Dispatchers.IO)

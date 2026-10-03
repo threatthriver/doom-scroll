@@ -114,11 +114,11 @@ internal fun AuthScaffold(
                         letterSpacing = (-0.5).sp,
                     )
                     Text(
-                        text = "ENCRYPTED PROTOCOL // V4",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
+                        text = "Private chats, made simple",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.SansSerif,
                         color = TextMuted,
-                        letterSpacing = 1.sp,
+                        letterSpacing = 0.2.sp,
                     )
                 }
             }
@@ -225,7 +225,7 @@ internal fun AuthScaffold(
 internal fun EmailField(value: String, onChange: (String) -> Unit) = OutlinedTextField(
     value = value,
     onValueChange = onChange,
-    label = { Text("EMAIL ADDRESS", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+    label = { Text("Email", fontSize = 13.sp) },
     singleLine = true,
     shape = RoundedCornerShape(10.dp),
     colors = OutlinedTextFieldDefaults.colors(
@@ -247,7 +247,7 @@ internal fun EmailField(value: String, onChange: (String) -> Unit) = OutlinedTex
 internal fun PasswordField(value: String, onChange: (String) -> Unit) = OutlinedTextField(
     value = value,
     onValueChange = onChange,
-    label = { Text("PASSWORD", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+    label = { Text("Password", fontSize = 13.sp) },
     singleLine = true,
     shape = RoundedCornerShape(10.dp),
     visualTransformation = PasswordVisualTransformation(),
@@ -271,7 +271,7 @@ internal fun ProfileFields(state: AuthUiState, vm: AuthViewModel) {
     OutlinedTextField(
         value = state.displayName,
         onValueChange = vm::onDisplayNameChange,
-        label = { Text("DISPLAY NAME", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+        label = { Text("Your name", fontSize = 13.sp) },
         singleLine = true,
         shape = RoundedCornerShape(10.dp),
         colors = OutlinedTextFieldDefaults.colors(
@@ -290,7 +290,7 @@ internal fun ProfileFields(state: AuthUiState, vm: AuthViewModel) {
     OutlinedTextField(
         value = state.username,
         onValueChange = vm::onUsernameChange,
-        label = { Text("NODE USERNAME", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+        label = { Text("Username", fontSize = 13.sp) },
         supportingText = {
             Text(
                 "3–20 characters: a-z, 0-9, _",

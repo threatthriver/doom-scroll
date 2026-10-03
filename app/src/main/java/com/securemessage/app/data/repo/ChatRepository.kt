@@ -11,4 +11,12 @@ interface ChatRepository {
     suspend fun getChat(chatId: String): Result<Chat>
     fun observeMessages(chatId: String): Flow<List<Message>>
     suspend fun sendMessage(chatId: String, senderId: String, text: String): Result<Unit>
+    suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit>
+    suspend fun addReaction(chatId: String, messageId: String, userId: String, emoji: String): Result<Unit>
+    suspend fun removeReaction(chatId: String, messageId: String, userId: String): Result<Unit>
+    suspend fun markChatRead(chatId: String, userId: String): Result<Unit>
+    suspend fun toggleMute(chatId: String, userId: String): Result<Unit>
+    suspend fun togglePin(chatId: String, userId: String): Result<Unit>
+    suspend fun toggleArchive(chatId: String, userId: String): Result<Unit>
+    suspend fun loadMoreMessages(chatId: String, beforeTimestamp: com.google.firebase.Timestamp, limit: Int): Result<List<Message>>
 }

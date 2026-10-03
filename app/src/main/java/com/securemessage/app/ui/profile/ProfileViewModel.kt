@@ -10,6 +10,7 @@ import com.securemessage.app.data.repo.UserRepository
 import com.securemessage.app.data.update.GitHubRelease
 import com.securemessage.app.data.update.GitHubUpdateManager
 import com.securemessage.app.data.update.UpdateState
+import com.securemessage.app.data.update.cleanReleaseNotes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,12 +23,17 @@ data class ProfileUiState(
     val username: String = "",
     val email: String = "",
     val uid: String = "",
+    val bio: String = "",
+    val photoUrl: String = "",
     val isLoading: Boolean = false,
     val isCheckingUpdates: Boolean = false,
     val updateStatusMessage: String? = null,
     val showUpdateDialog: Boolean = false,
+    // True when a newer version exists. Drives the small "ready" hint in Settings,
+    // so the app never has to interrupt the user with a pop-up on its own.
+    val updateAvailable: Boolean = false,
     val currentVersion: String = BuildConfig.VERSION_NAME,
-    val updateVersion: String = "1.0",
+    val updateVersion: String = "",
     val updateNotes: String = "",
     val apkSizeMb: String = "",
     val availableRelease: GitHubRelease? = null,
@@ -46,9 +52,12 @@ class ProfileViewModel(
     private val _state = MutableStateFlow(ProfileUiState())
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
 
+    // Guards against overlapping update checks (startup check + user tapping "Check")
+    private var isCheckRunning = false
+
     init {
         loadUserProfile()
-        // Auto check updates in background
+        // Quiet check on start: only marks "update available", never opens a pop-up.
         checkForUpdates(silent = true)
     }
 
@@ -69,7 +78,10 @@ class ProfileViewModel(
                     it.copy(
                         displayName = user.displayName.ifEmpty { it.displayName },
                         username = user.username,
-                        email = if (user.emailLower.isNotEmpty()) user.emailLower else it.email,
+                        // Email comes from Firebase Auth (owner-only), never from the
+                        // public profile doc, so it is seeded above from currentEmail.
+                        bio = user.bio,
+                        photoUrl = user.photoUrl,
                         isLoading = false,
                     )
                 }
@@ -79,70 +91,132 @@ class ProfileViewModel(
         }
     }
 
+    fun updateProfile(displayName: String, bio: String) {
+        val uid = authRepo.currentUserId ?: return
+        _state.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch {
+            userRepo.updateProfile(uid, displayName, bio, _state.value.photoUrl)
+                .onSuccess {
+                    _state.update {
+                        it.copy(
+                            displayName = displayName,
+                            bio = bio,
+                            isLoading = false,
+                            userNotification = "Profile saved",
+                        )
+                    }
+                }
+                .onFailure {
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            userNotification = "Couldn't save your profile",
+                        )
+                    }
+                }
+        }
+    }
+
+    /**
+     * [silent] = true  -> background check: no spinner, no pop-up, no error messages.
+     * [silent] = false -> user tapped "Check": show spinner, open the dialog if there is
+     *                     an update, and tell the user the result either way.
+     */
     fun checkForUpdates(silent: Boolean = false) {
+        if (isCheckRunning || _state.value.isDownloadingUpdate) return
+        isCheckRunning = true
+
         viewModelScope.launch {
             val currentVersion = BuildConfig.VERSION_NAME
             if (!silent) {
                 _state.update { it.copy(isCheckingUpdates = true, updateStatusMessage = null) }
             }
 
-            GitHubUpdateManager.checkForUpdate(currentVersion).collect { updateState ->
-                when (updateState) {
-                    is UpdateState.Checking -> {
-                        if (!silent) _state.update { it.copy(isCheckingUpdates = true) }
-                    }
-                    is UpdateState.Available -> {
-                        val sizeMb = if (updateState.release.apkSize > 0) {
-                            String.format("%.1f MB", updateState.release.apkSize / (1024.0 * 1024.0))
-                        } else {
-                            ""
+            try {
+                GitHubUpdateManager.checkForUpdate(currentVersion).collect { updateState ->
+                    when (updateState) {
+                        is UpdateState.Available -> {
+                            val release = updateState.release
+                            val sizeMb = if (release.apkSize > 0) {
+                                String.format("%.1f MB", release.apkSize / (1024.0 * 1024.0))
+                            } else {
+                                ""
+                            }
+                            _state.update {
+                                it.copy(
+                                    isCheckingUpdates = false,
+                                    updateAvailable = true,
+                                    showUpdateDialog = !silent,
+                                    availableRelease = release,
+                                    updateVersion = release.tagName.removePrefix("v").removePrefix("V"),
+                                    updateNotes = cleanReleaseNotes(release.body),
+                                    apkSizeMb = sizeMb,
+                                )
+                            }
                         }
-                        _state.update {
-                            it.copy(
-                                isCheckingUpdates = false,
-                                showUpdateDialog = true,
-                                availableRelease = updateState.release,
-                                updateVersion = updateState.release.tagName,
-                                updateNotes = updateState.release.body,
-                                apkSizeMb = sizeMb,
-                                updateStatusMessage = "UPDATE ${updateState.release.tagName} DISCOVERED",
-                            )
+
+                        is UpdateState.UpToDate -> {
+                            _state.update {
+                                it.copy(
+                                    isCheckingUpdates = false,
+                                    updateAvailable = false,
+                                    userNotification = if (!silent) {
+                                        "You're up to date (version $currentVersion)"
+                                    } else {
+                                        it.userNotification
+                                    },
+                                )
+                            }
                         }
-                    }
-                    is UpdateState.UpToDate -> {
-                        _state.update {
-                            it.copy(
-                                isCheckingUpdates = false,
-                                userNotification = if (!silent) "SYSTEM IS UP TO DATE // V$currentVersion" else null
-                            )
+
+                        is UpdateState.Error -> {
+                            _state.update {
+                                it.copy(
+                                    isCheckingUpdates = false,
+                                    userNotification = if (!silent) {
+                                        "Couldn't check for updates. Please try again."
+                                    } else {
+                                        it.userNotification
+                                    },
+                                )
+                            }
                         }
+
+                        else -> Unit
                     }
-                    is UpdateState.Error -> {
-                        _state.update {
-                            it.copy(
-                                isCheckingUpdates = false,
-                                userNotification = if (!silent) "UPDATE CHECK FAILED: ${updateState.message}" else null
-                            )
-                        }
-                    }
-                    else -> Unit
                 }
+            } finally {
+                isCheckRunning = false
+                _state.update { it.copy(isCheckingUpdates = false) }
             }
         }
     }
 
+    /** Opens the update dialog for an update that was already found by the quiet check. */
+    fun openUpdateDialog() {
+        if (_state.value.availableRelease != null) {
+            _state.update { it.copy(showUpdateDialog = true) }
+        } else {
+            checkForUpdates(silent = false)
+        }
+    }
+
     fun dismissUpdateDialog() {
-        _state.update { it.copy(showUpdateDialog = false, isDownloadingUpdate = false, downloadProgress = 0f) }
+        // Keep the download running if one is in progress; only hide the dialog.
+        _state.update { it.copy(showUpdateDialog = false) }
     }
 
     fun startUpdateDownload(context: Context) {
         val release = _state.value.availableRelease ?: return
+        if (_state.value.isDownloadingUpdate) return
+
         viewModelScope.launch {
             _state.update {
                 it.copy(
                     isDownloadingUpdate = true,
                     downloadProgress = 0f,
-                    downloadedBytesText = "Preparing download..."
+                    downloadedBytesText = "Starting download...",
                 )
             }
 
@@ -152,37 +226,47 @@ class ProfileViewModel(
                         val downloadedMb = updateState.downloadedBytes / (1024f * 1024f)
                         val totalMb = updateState.totalBytes / (1024f * 1024f)
                         val text = if (totalMb > 0) {
-                            String.format("%.1f MB / %.1f MB (%.0f%%)", downloadedMb, totalMb, updateState.progress * 100)
+                            String.format("%.1f of %.1f MB", downloadedMb, totalMb)
                         } else {
                             String.format("%.1f MB downloaded", downloadedMb)
                         }
                         _state.update {
                             it.copy(
                                 downloadProgress = updateState.progress,
-                                downloadedBytesText = text
+                                downloadedBytesText = text,
                             )
                         }
                     }
+
                     is UpdateState.ReadyToInstall -> {
                         _state.update {
                             it.copy(
                                 isDownloadingUpdate = false,
                                 showUpdateDialog = false,
                                 downloadedApkFile = updateState.apkFile,
-                                userNotification = "UPDATE DOWNLOADED // LAUNCHING INSTALLER"
+                                userNotification = "Update downloaded. Opening the installer...",
                             )
                         }
-                        // Launch system package installer
-                        GitHubUpdateManager.promptInstall(context, updateState.apkFile)
+                        val opened = GitHubUpdateManager.promptInstall(context, updateState.apkFile)
+                        if (!opened) {
+                            // Android first asks the user to allow installs from this app.
+                            _state.update {
+                                it.copy(
+                                    userNotification = "Allow installs from this app, then come back and tap Install.",
+                                )
+                            }
+                        }
                     }
+
                     is UpdateState.Error -> {
                         _state.update {
                             it.copy(
                                 isDownloadingUpdate = false,
-                                userNotification = "DOWNLOAD FAILED: ${updateState.message}"
+                                userNotification = "Download failed. Please try again.",
                             )
                         }
                     }
+
                     else -> Unit
                 }
             }
@@ -192,7 +276,12 @@ class ProfileViewModel(
     fun installDownloadedApk(context: Context) {
         val file = _state.value.downloadedApkFile ?: return
         viewModelScope.launch {
-            GitHubUpdateManager.promptInstall(context, file)
+            val opened = GitHubUpdateManager.promptInstall(context, file)
+            if (!opened) {
+                _state.update {
+                    it.copy(userNotification = "Allow installs from this app, then tap Install again.")
+                }
+            }
         }
     }
 

@@ -63,6 +63,10 @@ fun AppNavHost(container: AppContainer) {
                 onOpenChat = { id -> nav.navigate(Routes.chat(id)) },
                 onNeedsProfile = { nav.navigateClearing(Routes.completeProfile()) },
                 onSignedOut = { nav.navigateClearing(Routes.SIGN_IN) },
+                onEditProfile = { displayName, bio ->
+                    // Profile editing is handled within the ProfileScreen
+                    // This callback can be used to trigger a snackbar or other UI feedback
+                },
             )
         }
         composable(Routes.USERS) {

@@ -1,5 +1,6 @@
 package com.securemessage.app.fakes
 
+import com.google.firebase.Timestamp
 import com.securemessage.app.data.model.Chat
 import com.securemessage.app.data.model.Message
 import com.securemessage.app.data.model.User
@@ -25,8 +26,9 @@ class FakeAuthRepository(
 
 class FakeUserRepository : UserRepository {
     var createResult: Result<Unit> = Result.success(Unit)
-    var getUserResult: Result<User> = Result.success(User("me", "me", "Me", "me@example.com"))
+    var getUserResult: Result<User> = Result.success(User("me", "me", "Me"))
     var searchResult: Result<List<User>> = Result.success(emptyList())
+    var updateResult: Result<Unit> = Result.success(Unit)
     val created = mutableListOf<User>()
     val searches = mutableListOf<String>()
     var getUserCalls = 0
@@ -37,6 +39,9 @@ class FakeUserRepository : UserRepository {
         searches += query
         return searchResult.map { list -> list.filter { it.uid != excludeUid } }
     }
+    override suspend fun updateProfile(uid: String, displayName: String, bio: String, photoUrl: String): Result<Unit> {
+        return updateResult
+    }
 }
 
 class FakeChatRepository : ChatRepository {
@@ -45,7 +50,20 @@ class FakeChatRepository : ChatRepository {
     var openResult: Result<String> = Result.success("chat1")
     var getChatResult: Result<Chat> = Result.failure(NoSuchElementException())
     var sendResult: Result<Unit> = Result.success(Unit)
+    var addReactionResult: Result<Unit> = Result.success(Unit)
+    var removeReactionResult: Result<Unit> = Result.success(Unit)
+    var markReadResult: Result<Unit> = Result.success(Unit)
+    var toggleMuteResult: Result<Unit> = Result.success(Unit)
+    var togglePinResult: Result<Unit> = Result.success(Unit)
+    var toggleArchiveResult: Result<Unit> = Result.success(Unit)
+    var loadMoreResult: Result<List<Message>> = Result.success(emptyList())
     val sent = mutableListOf<String>()
+    val deleted = mutableListOf<String>()
+    val reactions = mutableListOf<Triple<String, String, String>>()
+    val readMarked = mutableListOf<String>()
+    val mutedToggled = mutableListOf<String>()
+    val pinnedToggled = mutableListOf<String>()
+    val archivedToggled = mutableListOf<String>()
 
     override fun observeChats(uid: String): Flow<List<Chat>> = chats
     override suspend fun openChat(me: User, other: User): Result<String> = openResult
@@ -54,5 +72,36 @@ class FakeChatRepository : ChatRepository {
     override suspend fun sendMessage(chatId: String, senderId: String, text: String): Result<Unit> {
         sent += text
         return sendResult
+    }
+    override suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit> {
+        deleted += messageId
+        return Result.success(Unit)
+    }
+    override suspend fun addReaction(chatId: String, messageId: String, userId: String, emoji: String): Result<Unit> {
+        reactions.add(Triple(messageId, userId, emoji))
+        return addReactionResult
+    }
+    override suspend fun removeReaction(chatId: String, messageId: String, userId: String): Result<Unit> {
+        reactions.remove(Triple(messageId, userId, ""))
+        return removeReactionResult
+    }
+    override suspend fun markChatRead(chatId: String, userId: String): Result<Unit> {
+        readMarked += chatId
+        return markReadResult
+    }
+    override suspend fun toggleMute(chatId: String, userId: String): Result<Unit> {
+        mutedToggled += chatId
+        return toggleMuteResult
+    }
+    override suspend fun togglePin(chatId: String, userId: String): Result<Unit> {
+        pinnedToggled += chatId
+        return togglePinResult
+    }
+    override suspend fun toggleArchive(chatId: String, userId: String): Result<Unit> {
+        archivedToggled += chatId
+        return toggleArchiveResult
+    }
+    override suspend fun loadMoreMessages(chatId: String, beforeTimestamp: Timestamp, limit: Int): Result<List<Message>> {
+        return loadMoreResult
     }
 }

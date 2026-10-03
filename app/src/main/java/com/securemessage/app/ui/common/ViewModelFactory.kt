@@ -32,7 +32,14 @@ object AppViewModelFactory {
         }
         initializer {
             val c = container()
-            ChatViewModel(createSavedStateHandle(), c.chatRepository, c.authRepository)
+            val app = this[APPLICATION_KEY] as SecureMessageApp
+            ChatViewModel(
+                createSavedStateHandle(),
+                c.chatRepository,
+                c.authRepository,
+                c.chatSessionManager,
+                app.applicationContext,
+            )
         }
         initializer {
             val c = container()

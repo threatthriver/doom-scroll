@@ -8,4 +8,8 @@ data class Chat(
     val participantNames: Map<String, String> = emptyMap(),
     val lastMessage: String = "",
     val lastMessageAt: Timestamp? = null,
+    val unreadCount: Map<String, Int> = emptyMap(), // userId -> count
+    val muted: Map<String, Boolean> = emptyMap(), // userId -> muted
+    val pinned: Boolean = false,
+    val archived: Map<String, Boolean> = emptyMap(), // userId -> archived
 )

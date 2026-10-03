@@ -7,8 +7,6 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -30,8 +29,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,7 +43,6 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -53,6 +50,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
@@ -60,6 +58,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,7 +73,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -83,6 +81,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -101,14 +100,26 @@ import com.securemessage.app.data.model.Message
 import com.securemessage.app.ui.common.AppViewModelFactory
 import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.common.formatTime
+import com.securemessage.app.ui.common.formatDayLabel
+import com.securemessage.app.ui.common.isSameDay
+import com.securemessage.app.ui.common.TelegramWallpaper
 import com.securemessage.app.ui.theme.DockGlassBackground
+import com.securemessage.app.ui.theme.TgErrorRed
+import com.securemessage.app.ui.theme.TgLink
 import com.securemessage.app.ui.theme.HairlineBorder
 import com.securemessage.app.ui.theme.HairlineBorderSubtle
 import com.securemessage.app.ui.theme.ObsidianCard
+import com.securemessage.app.ui.theme.ObsidianCardHover
 import com.securemessage.app.ui.theme.ObsidianSurfaceElevated
 import com.securemessage.app.ui.theme.ObsidianVoid
 import com.securemessage.app.ui.theme.PureBlack
 import com.securemessage.app.ui.theme.PureWhite
+import com.securemessage.app.ui.theme.TgBlue
+import com.securemessage.app.ui.theme.TgBubbleIn
+import com.securemessage.app.ui.theme.TgBubbleInTime
+import com.securemessage.app.ui.theme.TgBubbleOut
+import com.securemessage.app.ui.theme.TgBubbleOutTime
+import com.securemessage.app.ui.theme.TgWallpaperBase
 import com.securemessage.app.ui.theme.TextMuted
 import com.securemessage.app.ui.theme.TextPrimary
 import com.securemessage.app.ui.theme.TextSecondary
@@ -134,9 +145,6 @@ fun ChatScreen(
     var showAttachmentSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
 
-    // Store reactions for messages locally in state
-    val messageReactions = remember { mutableStateMapOf<String, String>() }
-
     val isScrolledUp by remember {
         derivedStateOf { listState.canScrollForward }
     }
@@ -152,6 +160,11 @@ fun ChatScreen(
             vm.userMessageShown()
         }
     }
+    LaunchedEffect(listState.firstVisibleItemIndex) {
+        if (listState.firstVisibleItemIndex <= 2 && !state.isLoadingMore && state.hasMoreMessages) {
+            vm.loadMoreMessages()
+        }
+    }
 
     val initials = state.title.split(" ")
         .mapNotNull { it.firstOrNull()?.toString() }
@@ -162,110 +175,107 @@ fun ChatScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ObsidianVoid)
+            .background(TgWallpaperBase)
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
+        TelegramWallpaper(modifier = Modifier.fillMaxSize())
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .imePadding(),
         ) {
-            // Telegram Chat Header: Back button, Avatar, User Name, online status, 3-dot overflow
+            // Floating glass header (Telegram DM style): back pill | contact pill | menu pill
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    IconButton(
-                        onClick = {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(DockGlassBackground)
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                        .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onBack()
                         },
-                        modifier = Modifier.size(38.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = PureWhite,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
 
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(23.dp))
+                        .background(DockGlassBackground)
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(23.dp))
+                        .padding(start = 3.dp, end = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     MonochromeAvatar(
                         initials = initials,
                         size = 40.dp,
-                        showOnlineBadge = true,
                     )
-
-                    Column {
+                    Column(verticalArrangement = Arrangement.Center) {
                         Text(
                             text = state.title,
                             fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PureWhite,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(5.dp)
-                                    .clip(CircleShape)
-                                    .background(PureWhite),
-                            )
-                            Text(
-                                text = "online",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = TextMuted,
-                            )
-                        }
+                        Text(
+                            text = if (state.isEncrypted) "Secure chat" else "Not encrypted",
+                            fontSize = 12.sp,
+                            color = if (state.isEncrypted) TgLink else TgErrorRed,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
 
-                Box {
-                    IconButton(onClick = { showHeaderMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Options",
-                            tint = PureWhite,
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(DockGlassBackground)
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                        .clickable { showHeaderMenu = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "Options",
+                        tint = TextPrimary,
+                    )
 
                     DropdownMenu(
                         expanded = showHeaderMenu,
                         onDismissRequest = { showHeaderMenu = false },
-                        modifier = Modifier
-                            .background(ObsidianCard)
-                            .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp)),
+                        modifier = Modifier.background(ObsidianCard),
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Search in Chat", color = PureWhite, fontSize = 13.sp) },
+                            text = { Text("Check security code", color = TextPrimary) },
                             onClick = {
                                 showHeaderMenu = false
-                                Toast.makeText(context, "Search ready", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Security code: ${state.encryptionFingerprint}", Toast.LENGTH_LONG).show()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Mute Notifications", color = PureWhite, fontSize = 13.sp) },
-                            onClick = {
-                                showHeaderMenu = false
-                                Toast.makeText(context, "Notifications muted", Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Clear History", color = PureWhite, fontSize = 13.sp) },
+                            text = { Text("Clear History", color = TextPrimary) },
                             onClick = {
                                 showHeaderMenu = false
                                 Toast.makeText(context, "History cleared", Toast.LENGTH_SHORT).show()
@@ -275,15 +285,7 @@ fun ChatScreen(
                 }
             }
 
-            // Hairline separator
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(HairlineBorderSubtle),
-            )
-
-            // Message Stream with Grouped Date Pill
+            // Message Stream (floating header above already provides the separation)
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
                     state = listState,
@@ -291,54 +293,58 @@ fun ChatScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    // Telegram Floating Date Pill
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
+                    if (state.isLoadingMore) {
+                        item {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(ObsidianSurfaceElevated)
-                                    .border(1.dp, HairlineBorderSubtle, RoundedCornerShape(14.dp))
-                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center,
                             ) {
-                                Text(
-                                    text = "TODAY",
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextMuted,
-                                    letterSpacing = 1.sp,
+                                CircularProgressIndicator(
+                                    color = PureWhite,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
                         }
                     }
 
-                    items(state.messages, key = { it.id }) { msg ->
+                    itemsIndexed(state.messages, key = { _, m -> m.id }) { index, msg ->
                         val isMine = msg.senderId == myUid
-                        val reaction = messageReactions[msg.id]
+                        val userReaction = msg.reactions[myUid]
+                        val reactionCount = msg.reactions.size
+                        val previous = state.messages.getOrNull(index - 1)
+                        val startsNewDay = previous == null ||
+                            !isSameDay(previous.timestamp, msg.timestamp)
 
-                        TelegramMessageBubble(
-                            message = msg,
-                            isMine = isMine,
-                            reaction = reaction,
-                            onTap = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                selectedMessageForMenu = msg
-                            },
-                            onLongPress = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedMessageForMenu = msg
-                            },
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            // One divider per calendar day, instead of a single hard-coded "TODAY"
+                            if (startsNewDay) {
+                                TelegramDateChip(label = formatDayLabel(msg.timestamp))
+                            }
+
+                            TelegramMessageBubble(
+                                message = msg,
+                                isMine = isMine,
+                                userReaction = userReaction,
+                                reactionCount = reactionCount,
+                                onTap = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedMessageForMenu = msg
+                                },
+                                onLongPress = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    selectedMessageForMenu = msg
+                                },
+                            )
+                        }
                     }
                 }
 
-                // Scroll to bottom FAB
                 if (isScrolledUp) {
                     Box(
                         modifier = Modifier
@@ -365,7 +371,7 @@ fun ChatScreen(
                 }
             }
 
-            // Telegram Reply Preview Banner (Anchored right above input)
+            // Reply Preview Banner
             if (replyingToMessage != null) {
                 val replyMsg = replyingToMessage!!
                 Row(
@@ -424,45 +430,44 @@ fun ChatScreen(
                 }
             }
 
-            // Telegram Bottom Input Dock: Smiley, Text Field, Attachment Paperclip, Mic / Send Button
+            // Bottom Input Dock: transparent so the wallpaper shows through, like Telegram DMs
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ObsidianVoid)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // Integrated Pill Container for Emoji, Input, and Paperclip
+                    // Note: the blue "Menu" command button is bot-only in Telegram, so a
+                    // person-to-person chat intentionally has no such button.
                     Row(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(26.dp))
-                            .background(ObsidianCard)
-                            .border(1.dp, HairlineBorder, RoundedCornerShape(26.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .heightIn(min = 48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(DockGlassBackground)
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Emoji / Smiley Button
                         IconButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                Toast.makeText(context, "Stickers and Emojis", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Emoji picker coming soon", Toast.LENGTH_SHORT).show()
                             },
-                            modifier = Modifier.size(34.dp),
+                            modifier = Modifier.size(36.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.SentimentSatisfiedAlt,
-                                contentDescription = "Emoji & Stickers",
-                                tint = TextMuted,
-                                modifier = Modifier.size(20.dp),
+                                contentDescription = "Emoji",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(22.dp),
                             )
                         }
 
-                        // Message Text Field
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -472,19 +477,15 @@ fun ChatScreen(
                             if (state.draft.isEmpty()) {
                                 Text(
                                     text = "Message",
-                                    fontSize = 14.sp,
+                                    fontSize = 16.sp,
                                     color = TextMuted,
                                 )
                             }
                             BasicTextField(
                                 value = state.draft,
                                 onValueChange = vm::onDraftChange,
-                                textStyle = TextStyle(
-                                    color = PureWhite,
-                                    fontSize = 14.sp,
-                                    fontFamily = FontFamily.SansSerif,
-                                ),
-                                cursorBrush = SolidColor(PureWhite),
+                                textStyle = TextStyle(color = TextPrimary, fontSize = 16.sp),
+                                cursorBrush = SolidColor(TgBlue),
                                 maxLines = 4,
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                                 keyboardActions = KeyboardActions(
@@ -500,29 +501,27 @@ fun ChatScreen(
                             )
                         }
 
-                        // Telegram Paperclip Attachment Button
                         IconButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 showAttachmentSheet = true
                             },
-                            modifier = Modifier.size(34.dp),
+                            modifier = Modifier.size(36.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.AttachFile,
-                                contentDescription = "Attach Media",
-                                tint = PureWhite,
-                                modifier = Modifier.size(20.dp),
+                                contentDescription = "Attach",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(22.dp),
                             )
                         }
                     }
 
-                    // Dynamic Send / Mic Record Button
                     Box(
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
-                            .background(PureWhite)
+                            .background(TgBlue)
                             .clickable {
                                 if (state.draft.isNotBlank()) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -530,26 +529,17 @@ fun ChatScreen(
                                     replyingToMessage = null
                                 } else {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    Toast.makeText(context, "Hold to record audio note", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Voice notes coming soon", Toast.LENGTH_SHORT).show()
                                 }
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (state.draft.isNotBlank()) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send",
-                                tint = PureBlack,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Filled.Mic,
-                                contentDescription = "Record Audio",
-                                tint = PureBlack,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
+                        Icon(
+                            imageVector = if (state.draft.isNotBlank()) Icons.AutoMirrored.Filled.Send else Icons.Filled.Mic,
+                            contentDescription = if (state.draft.isNotBlank()) "Send" else "Record Audio",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
                 }
             }
@@ -560,14 +550,14 @@ fun ChatScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         )
 
-        // Telegram Message Context Menu Modal with Reaction Strip
+        // Message Context Menu
         selectedMessageForMenu?.let { selectedMsg ->
             TelegramMessageActionDialog(
                 message = selectedMsg,
                 onDismiss = { selectedMessageForMenu = null },
                 onReact = { emoji ->
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    messageReactions[selectedMsg.id] = emoji
+                    vm.addReaction(selectedMsg, emoji)
                     selectedMessageForMenu = null
                 },
                 onReply = {
@@ -582,22 +572,14 @@ fun ChatScreen(
                     Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                     selectedMessageForMenu = null
                 },
-                onForward = {
-                    Toast.makeText(context, "Forward message", Toast.LENGTH_SHORT).show()
-                    selectedMessageForMenu = null
-                },
-                onPin = {
-                    Toast.makeText(context, "Message pinned", Toast.LENGTH_SHORT).show()
-                    selectedMessageForMenu = null
-                },
                 onDelete = {
-                    Toast.makeText(context, "Message deleted", Toast.LENGTH_SHORT).show()
+                    vm.deleteMessage(selectedMsg)
                     selectedMessageForMenu = null
                 },
             )
         }
 
-        // Telegram Attachment Bottom Sheet
+        // Attachment Bottom Sheet
         if (showAttachmentSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showAttachmentSheet = false },
@@ -617,7 +599,7 @@ fun ChatScreen(
                 TelegramAttachmentSheetContent(
                     onActionSelected = { action ->
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "Selected: $action", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "$action coming soon", Toast.LENGTH_SHORT).show()
                         showAttachmentSheet = false
                     },
                 )
@@ -631,79 +613,94 @@ fun ChatScreen(
 private fun TelegramMessageBubble(
     message: Message,
     isMine: Boolean,
-    reaction: String?,
+    userReaction: String?,
+    reactionCount: Int,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
-    // Telegram-style asymmetric bubble corners: subtle tail on bottom-right for outgoing, bottom-left for incoming
     val bubbleShape = if (isMine) {
         RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
     } else {
         RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
     }
 
-    val bubbleBg = if (isMine) PureWhite else ObsidianCard
-    val textColor = if (isMine) PureBlack else PureWhite
-    val metaColor = if (isMine) TextMuted else TextMuted
+    // Telegram bubbles: outgoing blue->violet gradient, incoming dark slate, white text on both
+    val bubbleBrush = if (isMine) {
+        Brush.horizontalGradient(listOf(TgBubbleOut, Color(0xFF4F8DEB)))
+    } else {
+        Brush.horizontalGradient(listOf(TgBubbleIn, TgBubbleIn))
+    }
+    val textColor = Color.White
+    val metaColor = if (isMine) TgBubbleOutTime else TgBubbleInTime
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .widthIn(min = 80.dp, max = 290.dp)
                 .clip(bubbleShape)
-                .background(bubbleBg)
-                .border(1.dp, if (isMine) Color.Transparent else HairlineBorder, bubbleShape)
+                .background(bubbleBrush)
                 .combinedClickable(
                     onClick = onTap,
                     onLongClick = onLongPress,
                 )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Column {
+            Text(
+                text = message.text,
+                color = textColor,
+                fontSize = 16.sp,
+                lineHeight = 21.sp,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Spacer(Modifier.width(10.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.padding(bottom = 2.dp),
+            ) {
                 Text(
-                    text = message.text,
-                    color = textColor,
-                    fontSize = 14.sp,
-                    lineHeight = 19.sp,
+                    text = formatTime(message.timestamp),
+                    color = metaColor,
+                    fontSize = 11.sp,
                 )
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        text = formatTime(message.timestamp).lowercase(),
-                        color = metaColor,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
+                if (isMine) {
+                    Icon(
+                        imageVector = Icons.Filled.DoneAll,
+                        contentDescription = "Read",
+                        tint = metaColor,
+                        modifier = Modifier.size(14.dp),
                     )
-                    if (isMine) {
-                        Icon(
-                            imageVector = Icons.Filled.DoneAll,
-                            contentDescription = "Read",
-                            tint = PureBlack,
-                            modifier = Modifier.size(13.dp),
-                        )
-                    }
                 }
             }
         }
 
-        // Reaction badge displayed beneath the bubble
-        reaction?.let { r ->
+        if (reactionCount > 0) {
             Box(
                 modifier = Modifier
                     .padding(top = 2.dp, start = if (isMine) 0.dp else 6.dp, end = if (isMine) 6.dp else 0.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(ObsidianCard)
-                    .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
+                    .background(if (userReaction != null) TgBlue else ObsidianCardHover)
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             ) {
-                Text(text = r, fontSize = 12.sp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    val displayEmoji = message.reactions.values.groupingBy { it }.eachCount()
+                        .maxByOrNull { it.value }?.key ?: message.reactions.values.firstOrNull() ?: ""
+                    Text(text = displayEmoji, fontSize = 12.sp)
+                    if (reactionCount > 1) {
+                        Text(
+                            text = reactionCount.toString(),
+                            fontSize = 10.sp,
+                            color = if (userReaction != null) Color.White else TextMuted,
+                        )
+                    }
+                }
             }
         }
     }
@@ -716,8 +713,6 @@ private fun TelegramMessageActionDialog(
     onReact: (String) -> Unit,
     onReply: () -> Unit,
     onCopy: () -> Unit,
-    onForward: () -> Unit,
-    onPin: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val reactions = listOf("🖤", "🔥", "⚡", "👍", "👎", "💀", "🔒")
@@ -736,7 +731,6 @@ private fun TelegramMessageActionDialog(
                 .clickable(enabled = false) {}
                 .padding(24.dp),
         ) {
-            // Telegram Floating Reaction Strip
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(28.dp))
@@ -757,7 +751,6 @@ private fun TelegramMessageActionDialog(
                 }
             }
 
-            // Telegram Action Popup Card
             Box(
                 modifier = Modifier
                     .width(240.dp)
@@ -769,10 +762,6 @@ private fun TelegramMessageActionDialog(
                     TelegramMenuRow(Icons.AutoMirrored.Filled.Reply, "Reply", onReply)
                     Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
                     TelegramMenuRow(Icons.Filled.ContentCopy, "Copy", onCopy)
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
-                    TelegramMenuRow(Icons.AutoMirrored.Filled.Send, "Forward", onForward)
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
-                    TelegramMenuRow(Icons.Filled.PushPin, "Pin", onPin)
                     Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
                     TelegramMenuRow(Icons.Filled.Delete, "Delete", onDelete)
                 }
@@ -820,7 +809,6 @@ private fun TelegramAttachmentSheetContent(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Quick Action: "Open Camera"
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -856,7 +844,7 @@ private fun TelegramAttachmentSheetContent(
                         color = PureWhite,
                     )
                     Text(
-                        text = "Take a photo or record encrypted video",
+                        text = "Take a photo or record video",
                         fontSize = 11.sp,
                         color = TextMuted,
                     )
@@ -866,13 +854,12 @@ private fun TelegramAttachmentSheetContent(
 
         Spacer(Modifier.height(20.dp))
 
-        // Telegram Attachment Category Tabs
         val options = listOf(
             Triple(Icons.Filled.PhotoLibrary, "Gallery", "Photos & Videos"),
             Triple(Icons.Filled.InsertDriveFile, "File", "Documents up to 2GB"),
             Triple(Icons.Filled.LocationOn, "Location", "Share live coordinates"),
             Triple(Icons.Filled.MusicNote, "Audio", "Music and voice notes"),
-            Triple(Icons.Filled.BarChart, "Poll", "Create encrypted poll"),
+            Triple(Icons.Filled.BarChart, "Poll", "Create a poll"),
             Triple(Icons.Filled.Person, "Contact", "Share vCard contact"),
         )
 
@@ -925,5 +912,31 @@ private fun TelegramAttachmentSheetContent(
         }
 
         Spacer(Modifier.height(28.dp))
+    }
+}
+
+
+/** Centered day divider pill ("Today", "Yesterday", "October 1") like Telegram's. */
+@Composable
+private fun TelegramDateChip(label: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.Black.copy(alpha = 0.28f))
+                .padding(horizontal = 14.dp, vertical = 5.dp),
+        ) {
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+        }
     }
 }

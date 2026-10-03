@@ -35,7 +35,7 @@ fun SignUpScreen(
     AuthScaffold(
         title = "Initialize Node",
         state = state,
-        primaryLabel = "Register Transmitter",
+        primaryLabel = "Create account",
         onPrimary = vm::signUp,
         navigationIcon = {
             IconButton(

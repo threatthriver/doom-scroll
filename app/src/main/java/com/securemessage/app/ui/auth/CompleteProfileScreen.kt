@@ -27,14 +27,14 @@ fun CompleteProfileScreen(
     LaunchedEffect(state.isAuthenticated) { if (state.isAuthenticated) onAuthenticated() }
 
     AuthScaffold(
-        title = "Configure Identity",
+        title = "Set up your profile",
         state = state,
-        primaryLabel = "Establish Node",
+        primaryLabel = "Continue",
         onPrimary = vm::completeProfile,
         footer = {
             TextButton(onClick = { vm.signOut(); onSignedOut() }) {
                 Text(
-                    text = "ABORT // SIGN OUT",
+                    text = "Sign out",
                     color = PureWhite,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
@@ -43,7 +43,7 @@ fun CompleteProfileScreen(
         },
     ) {
         Text(
-            text = "Select a unique node handle so peer transmitters can reach you across the encrypted mesh.",
+            text = "Pick a unique username so others can find and message you.",
             fontSize = 13.sp,
             color = TextMuted,
         )

@@ -11,6 +11,9 @@ interface UserRepository {
     /** Fails with [NoSuchElementException] if the profile does not exist. */
     suspend fun getUser(uid: String): Result<User>
 
-    /** Exact email match if the query contains '@', otherwise username prefix match. */
+    /** Prefix match on username. Email lookup is intentionally unsupported (privacy). */
     suspend fun searchUsers(query: String, excludeUid: String): Result<List<User>>
+
+    /** Update profile fields (displayName, bio, photoUrl). */
+    suspend fun updateProfile(uid: String, displayName: String, bio: String, photoUrl: String): Result<Unit>
 }

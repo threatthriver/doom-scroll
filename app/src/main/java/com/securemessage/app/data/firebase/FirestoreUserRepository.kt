@@ -23,7 +23,8 @@ class FirestoreUserRepository(private val db: FirebaseFirestore) : UserRepositor
                 "uid" to user.uid,
                 "username" to user.username,
                 "displayName" to user.displayName,
-                "emailLower" to user.emailLower,
+                "photoUrl" to user.photoUrl,
+                "bio" to user.bio,
                 "createdAt" to FieldValue.serverTimestamp(),
             ),
         )
@@ -56,23 +57,35 @@ class FirestoreUserRepository(private val db: FirebaseFirestore) : UserRepositor
     }.onFailure { if (it !is NoSuchElementException) Log.w(TAG, "getUser failed", it) }
 
     override suspend fun searchUsers(query: String, excludeUid: String): Result<List<User>> = runCatching {
-        val q = query.trim().lowercase()
+        // Discovery is by username only. We deliberately do NOT support lookup by email:
+        // querying users by emailLower would let any signed-in account confirm whether a
+        // given email is registered (account enumeration), and the public users doc no
+        // longer stores email at all.
+        val q = query.trim().lowercase().removePrefix("@")
         if (q.isEmpty()) return@runCatching emptyList()
-        val firestoreQuery = if ('@' in q) {
-            users.whereEqualTo("emailLower", q).limit(20)
-        } else {
-            users.orderBy("username").startAt(q).endAt(q + "\uf8ff").limit(20)
-        }
-        firestoreQuery.get().await().documents
+        users.orderBy("username").startAt(q).endAt(q + "\uf8ff").limit(20)
+            .get().await().documents
             .map { it.toUser() }
             .filter { it.uid != excludeUid }
     }.onFailure { Log.w(TAG, "searchUsers failed", it) }
+
+    override suspend fun updateProfile(uid: String, displayName: String, bio: String, photoUrl: String): Result<Unit> = runCatching {
+        users.document(uid).update(
+            mapOf(
+                "displayName" to displayName,
+                "bio" to bio,
+                "photoUrl" to photoUrl,
+            )
+        ).await()
+        Unit
+    }.onFailure { Log.w(TAG, "updateProfile failed", it) }
 
     private fun DocumentSnapshot.toUser() = User(
         uid = getString("uid") ?: id,
         username = getString("username").orEmpty(),
         displayName = getString("displayName").orEmpty(),
-        emailLower = getString("emailLower").orEmpty(),
+        photoUrl = getString("photoUrl").orEmpty(),
+        bio = getString("bio").orEmpty(),
     )
 
     private companion object {
