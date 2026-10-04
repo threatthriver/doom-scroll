@@ -11,6 +11,7 @@ import com.securemessage.app.data.update.GitHubRelease
 import com.securemessage.app.data.update.GitHubUpdateManager
 import com.securemessage.app.data.update.UpdateState
 import com.securemessage.app.data.update.cleanReleaseNotes
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,10 +55,12 @@ class ProfileViewModel(
 
     // Guards against overlapping update checks (startup check + user tapping "Check")
     private var isCheckRunning = false
+    private var downloadJob: Job? = null
 
     init {
         loadUserProfile()
         // Quiet check on start: only marks "update available", never opens a pop-up.
+        // Cool-down lives in checkForUpdates() so restarts don't hammer the GitHub API.
         checkForUpdates(silent = true)
     }
 
@@ -122,9 +125,14 @@ class ProfileViewModel(
      * [silent] = true  -> background check: no spinner, no pop-up, no error messages.
      * [silent] = false -> user tapped "Check": show spinner, open the dialog if there is
      *                     an update, and tell the user the result either way.
+     *
+     * Silent checks are rate-limited to once per [SILENT_CHECK_COOLDOWN_MS] (persisted
+     * across restarts) so the app never hammers the GitHub API on every cold start.
+     * Pass [appContext] when available so the cool-down timestamp can be persisted.
      */
-    fun checkForUpdates(silent: Boolean = false) {
+    fun checkForUpdates(silent: Boolean = false, appContext: Context? = null) {
         if (isCheckRunning || _state.value.isDownloadingUpdate) return
+        if (silent && appContext != null && !shouldSilentCheck(appContext)) return
         isCheckRunning = true
 
         viewModelScope.launch {
@@ -137,11 +145,17 @@ class ProfileViewModel(
                 GitHubUpdateManager.checkForUpdate(currentVersion).collect { updateState ->
                     when (updateState) {
                         is UpdateState.Available -> {
+                            appContext?.let { markSilentChecked(it) }
                             val release = updateState.release
                             val sizeMb = if (release.apkSize > 0) {
                                 String.format("%.1f MB", release.apkSize / (1024.0 * 1024.0))
                             } else {
                                 ""
+                            }
+                            // If this version was already downloaded by an earlier run,
+                            // surface the cached file so the button reads "Install".
+                            val cached = appContext?.let { ctx ->
+                                findCachedApk(ctx, release.tagName, release.apkSize)
                             }
                             _state.update {
                                 it.copy(
@@ -152,11 +166,13 @@ class ProfileViewModel(
                                     updateVersion = release.tagName.removePrefix("v").removePrefix("V"),
                                     updateNotes = cleanReleaseNotes(release.body),
                                     apkSizeMb = sizeMb,
+                                    downloadedApkFile = cached ?: it.downloadedApkFile,
                                 )
                             }
                         }
 
                         is UpdateState.UpToDate -> {
+                            appContext?.let { markSilentChecked(it) }
                             _state.update {
                                 it.copy(
                                     isCheckingUpdates = false,
@@ -171,11 +187,14 @@ class ProfileViewModel(
                         }
 
                         is UpdateState.Error -> {
+                            appContext?.let { markSilentChecked(it) }
                             _state.update {
                                 it.copy(
                                     isCheckingUpdates = false,
+                                    // Surface the manager's specific message on manual checks
+                                    // (rate-limit, no-APK, no-network) instead of a generic one.
                                     userNotification = if (!silent) {
-                                        "Couldn't check for updates. Please try again."
+                                        updateState.message
                                     } else {
                                         it.userNotification
                                     },
@@ -210,8 +229,9 @@ class ProfileViewModel(
     fun startUpdateDownload(context: Context) {
         val release = _state.value.availableRelease ?: return
         if (_state.value.isDownloadingUpdate) return
+        downloadJob?.cancel()
 
-        viewModelScope.launch {
+        downloadJob = viewModelScope.launch {
             _state.update {
                 it.copy(
                     isDownloadingUpdate = true,
@@ -232,7 +252,7 @@ class ProfileViewModel(
                         }
                         _state.update {
                             it.copy(
-                                downloadProgress = updateState.progress,
+                                downloadProgress = updateState.progress.coerceIn(0f, 1f),
                                 downloadedBytesText = text,
                             )
                         }
@@ -252,7 +272,11 @@ class ProfileViewModel(
                             // Android first asks the user to allow installs from this app.
                             _state.update {
                                 it.copy(
-                                    userNotification = "Allow installs from this app, then come back and tap Install.",
+                                    userNotification = if (!updateState.apkFile.exists()) {
+                                        "Downloaded file is missing. Please download again."
+                                    } else {
+                                        "Allow installs from this app, then come back and tap Install."
+                                    },
                                 )
                             }
                         }
@@ -262,7 +286,7 @@ class ProfileViewModel(
                         _state.update {
                             it.copy(
                                 isDownloadingUpdate = false,
-                                userNotification = "Download failed. Please try again.",
+                                userNotification = updateState.message,
                             )
                         }
                     }
@@ -274,7 +298,18 @@ class ProfileViewModel(
     }
 
     fun installDownloadedApk(context: Context) {
-        val file = _state.value.downloadedApkFile ?: return
+        val file = _state.value.downloadedApkFile
+        // The file may have been cleared by the system or an older failed download.
+        if (file == null || !file.exists() || !GitHubUpdateManager.isValidApk(file)) {
+            _state.update {
+                it.copy(
+                    downloadedApkFile = null,
+                    userNotification = "Downloaded file is missing or corrupt. Downloading again...",
+                )
+            }
+            startUpdateDownload(context)
+            return
+        }
         viewModelScope.launch {
             val opened = GitHubUpdateManager.promptInstall(context, file)
             if (!opened) {
@@ -285,11 +320,60 @@ class ProfileViewModel(
         }
     }
 
+    /** Re-checks the cached APK (e.g. when Settings becomes visible after the installer ran). */
+    fun refreshCachedApk(context: Context) {
+        val release = _state.value.availableRelease ?: return
+        val cached = findCachedApk(context.applicationContext, release.tagName, release.apkSize)
+        if (cached == null && _state.value.downloadedApkFile != null) {
+            _state.update { it.copy(downloadedApkFile = null) }
+        } else if (cached != null && cached.absolutePath != _state.value.downloadedApkFile?.absolutePath) {
+            _state.update { it.copy(downloadedApkFile = cached) }
+        }
+    }
+
+    private fun findCachedApk(context: Context, tag: String, expectedSize: Long): File? {
+        return try {
+            val dir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+                ?: context.cacheDir
+            val sanitized = tag.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+            val file = File(dir, "doomscroll_update_$sanitized.apk")
+            if (!file.exists()) return null
+            if (expectedSize > 0 && file.length() != expectedSize) return null
+            if (!GitHubUpdateManager.isValidApk(file)) return null
+            file
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun shouldSilentCheck(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_UPDATES, Context.MODE_PRIVATE)
+        val last = prefs.getLong(KEY_LAST_SILENT_CHECK, 0L)
+        return System.currentTimeMillis() - last >= SILENT_CHECK_COOLDOWN_MS
+    }
+
+    private fun markSilentChecked(context: Context) {
+        try {
+            context.getSharedPreferences(PREFS_UPDATES, Context.MODE_PRIVATE)
+                .edit().putLong(KEY_LAST_SILENT_CHECK, System.currentTimeMillis()).apply()
+        } catch (_: Exception) {
+            // Prefs failure must never break the update flow.
+        }
+    }
+
     fun dismissNotification() {
         _state.update { it.copy(userNotification = null) }
     }
 
     fun signOut() {
+        downloadJob?.cancel()
         authRepo.signOut()
+    }
+
+    companion object {
+        private const val PREFS_UPDATES = "doomscroll_updates"
+        private const val KEY_LAST_SILENT_CHECK = "last_silent_check_ms"
+        /** Silent auto-checks hit the network at most once per 6h; manual taps always check. */
+        private const val SILENT_CHECK_COOLDOWN_MS = 6 * 60 * 60 * 1000L
     }
 }

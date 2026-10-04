@@ -151,7 +151,14 @@ fun ChatScreen(
 
     LaunchedEffect(state.messages.size) {
         if (state.messages.isNotEmpty()) {
-            listState.animateScrollToItem(state.messages.lastIndex)
+            // Don't yank the user away from history: only follow new messages when
+            // already pinned near the bottom.
+            val layout = listState.layoutInfo
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val nearBottom = lastVisible == -1 || lastVisible >= state.messages.lastIndex - 3
+            if (nearBottom) {
+                listState.animateScrollToItem(state.messages.lastIndex)
+            }
         }
     }
     LaunchedEffect(state.userMessage) {

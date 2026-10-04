@@ -35,6 +35,7 @@ const val MAX_MESSAGE_LENGTH = 2000
 const val MESSAGE_PAGE_SIZE = 50
 private const val ENCRYPTION_INIT_ATTEMPTS = 4
 private const val ENCRYPTION_RETRY_DELAY_MS = 1500L
+private const val MARK_READ_THROTTLE_MS = 5_000L
 
 class ChatViewModel(
     savedStateHandle: SavedStateHandle,
@@ -129,7 +130,13 @@ class ChatViewModel(
                     val key = encryptionKey
                     val decryptedMsgs = msgs.map { decryptMessage(it, key) }
                     _state.update { it.copy(messages = decryptedMsgs, error = null) }
-                    myUid?.let { uid -> markChatRead(uid) }
+                    myUid?.let { uid ->
+                        // Only mark read when the latest message is from someone else —
+                        // otherwise every incoming batch (including our own echo) fires a
+                        // Firestore write and creates a listener feedback loop.
+                        val lastFromOther = msgs.lastOrNull()?.senderId?.let { it != uid } == true
+                        if (lastFromOther) markChatReadThrottled(uid)
+                    }
                 }
         }
     }
@@ -215,10 +222,20 @@ class ChatViewModel(
         }
     }
 
+    private var lastMarkReadMs = 0L
+
     private fun markChatRead(userId: String) {
         viewModelScope.launch {
             chatRepo.markChatRead(chatId, userId)
         }
+    }
+
+    /** At most one read-receipt write per 5s; Firestore listeners make tighter loops wasteful. */
+    private fun markChatReadThrottled(userId: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastMarkReadMs < MARK_READ_THROTTLE_MS) return
+        lastMarkReadMs = now
+        markChatRead(userId)
     }
 
     fun userMessageShown() = _state.update { it.copy(userMessage = null) }

@@ -40,10 +40,11 @@ fun MainScreen(
     var selectedTab by remember { mutableStateOf(NavTab.CHATS) }
     val convState by conversationsVm.state.collectAsStateWithLifecycle()
 
-    val totalUnreadCount = remember(convState.chats) {
-        convState.chats.sumOf { chat ->
-            conversationsVm.myUid?.let { uid -> chat.unreadCount[uid] } ?: 0
-        }
+    val totalUnreadCount = remember(convState.chats, conversationsVm.myUid) {
+        val uid = conversationsVm.myUid ?: return@remember 0
+        convState.chats
+            .filterNot { it.archived[uid] == true }
+            .sumOf { it.unreadCount[uid] ?: 0 }
     }
 
     val currentUser = FirebaseAuth.getInstance().currentUser

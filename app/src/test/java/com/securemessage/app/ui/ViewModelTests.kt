@@ -324,8 +324,20 @@ class ChatViewModelTest {
     }
 
     @Test fun messagesMarkedAsRead() = runTest {
+        chats.messages.value = listOf(
+            com.securemessage.app.data.model.Message("m1", "hi", "bob")
+        )
         val v = vm()
         advanceUntilIdle()
         assertTrue(chats.readMarked.isNotEmpty())
+    }
+
+    @Test fun ownMessagesDoNotTriggerReadWrite() = runTest {
+        chats.messages.value = listOf(
+            com.securemessage.app.data.model.Message("m1", "hi", "me")
+        )
+        val v = vm()
+        advanceUntilIdle()
+        assertTrue(chats.readMarked.isEmpty())
     }
 }

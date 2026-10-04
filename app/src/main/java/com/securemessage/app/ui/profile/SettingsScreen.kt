@@ -98,6 +98,12 @@ fun SettingsScreen(
         }
     }
 
+    // Re-validate the cached APK each time Settings opens (installer may have run,
+    // or the file may have been cleared) and pass context so silent checks cool down.
+    LaunchedEffect(Unit) {
+        vm.refreshCachedApk(context.applicationContext)
+    }
+
     val displayName = state.displayName.ifEmpty { "User" }
     val initials = displayName.split(" ")
         .mapNotNull { it.firstOrNull()?.toString() }
@@ -304,7 +310,7 @@ fun SettingsScreen(
                                     when {
                                         hasDownloadedApk -> vm.installDownloadedApk(context)
                                         state.updateAvailable -> vm.openUpdateDialog()
-                                        else -> vm.checkForUpdates(silent = false)
+                                        else -> vm.checkForUpdates(silent = false, appContext = context.applicationContext)
                                     }
                                 }
                                 .heightIn(min = 38.dp)

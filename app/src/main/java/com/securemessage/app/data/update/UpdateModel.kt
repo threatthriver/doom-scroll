@@ -24,7 +24,7 @@ sealed interface UpdateState {
         val totalBytes: Long
     ) : UpdateState
     data class ReadyToInstall(val release: GitHubRelease, val apkFile: File) : UpdateState
-    data class Error(val message: String) : UpdateState
+    data class Error(val message: String, val retryable: Boolean = true) : UpdateState
 }
 
 

@@ -80,15 +80,23 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
                 "reactions" to emptyMap<String, String>(),
             ),
         )
-        // Increment unread count for other participants
+        // Increment unread count for other participants. Dot-notation paths update each
+        // recipient's counter atomically without replacing the whole map (the old code
+        // wrote the entire "unreadCount" map in one shot, which could wipe counters).
+        // Metadata uses merge-set so a first message to a fresh chat can't fail the batch.
         val chat = chatRef.get().await()
-        val participants = chat.get("participants") as? List<*> ?: emptyList<String>()
-        val unreadUpdates = participants.filter { it != senderId }.associate { it.toString() to FieldValue.increment(1) }
-        batch.update(chatRef, mapOf(
+        val participants = (chat.get("participants") as? List<*>)
+            ?.mapNotNull { it?.toString() }
+            .orEmpty()
+            .filter { it != senderId }
+        val metadata = mutableMapOf<String, Any>(
             "lastMessage" to text,
             "lastMessageAt" to FieldValue.serverTimestamp(),
-            "unreadCount" to unreadUpdates,
-        ))
+        )
+        participants.forEach { uid ->
+            metadata["unreadCount.$uid"] = FieldValue.increment(1)
+        }
+        batch.set(chatRef, metadata, SetOptions.merge())
         batch.commit().await()
         Unit
     }.onFailure { Log.w(TAG, "sendMessage failed", it) }
