@@ -35,15 +35,21 @@ android {
         applicationId = "com.securemessage.app"
         minSdk = 24
         targetSdk = 35
-        // Keep this in sync with the GitHub release tag (v1.1.0). The updater compares
+        // Keep this in sync with the GitHub release tag (v1.2.0). The updater compares
         // this version with the latest release tag, so a mismatch makes it offer the
         // same update again and again.
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {
         release {
+            // Signed with the debug key on purpose: the phone already has a debug-signed
+            // install, and Android only allows in-place updates when the signing key matches.
+            // This keeps the GitHub in-app updater working without an uninstall/reinstall.
+            // For a true public release, swap in a dedicated upload/release keystore (which
+            // would require users to reinstall once).
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
