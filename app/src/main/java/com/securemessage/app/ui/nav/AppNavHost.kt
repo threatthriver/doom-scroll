@@ -22,7 +22,7 @@ private fun NavHostController.navigateClearing(route: String) =
     navigate(route) { popUpTo(graph.id) { inclusive = true } }
 
 @Composable
-fun AppNavHost(container: AppContainer) {
+fun AppNavHost(container: AppContainer, openUpdates: Boolean = false) {
     val nav = rememberNavController()
     val start = remember {
         if (container.firebaseAuth.currentUser != null) Routes.CONVERSATIONS else Routes.SIGN_IN
@@ -63,6 +63,7 @@ fun AppNavHost(container: AppContainer) {
                 onOpenChat = { id -> nav.navigate(Routes.chat(id)) },
                 onNeedsProfile = { nav.navigateClearing(Routes.completeProfile()) },
                 onSignedOut = { nav.navigateClearing(Routes.SIGN_IN) },
+                openUpdates = openUpdates,
                 onEditProfile = { displayName, bio ->
                     // Profile editing is handled within the ProfileScreen
                     // This callback can be used to trigger a snackbar or other UI feedback

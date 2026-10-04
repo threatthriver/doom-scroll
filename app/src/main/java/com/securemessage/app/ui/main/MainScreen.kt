@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,8 +37,14 @@ fun MainScreen(
     onSignedOut: () -> Unit,
     onEditProfile: (String, String) -> Unit = { _, _ -> },
     conversationsVm: ConversationsViewModel = viewModel(factory = AppViewModelFactory.Factory),
+    // True when opened from the update notification: land on Settings (tray deep-link).
+    openUpdates: Boolean = false,
 ) {
-    var selectedTab by remember { mutableStateOf(NavTab.CHATS) }
+    var selectedTab by remember { mutableStateOf(if (openUpdates) NavTab.SETTINGS else NavTab.CHATS) }
+    // Handles tap-while-open (singleTop): re-route to Settings without resetting nav.
+    LaunchedEffect(openUpdates) {
+        if (openUpdates) selectedTab = NavTab.SETTINGS
+    }
     val convState by conversationsVm.state.collectAsStateWithLifecycle()
 
     val totalUnreadCount = remember(convState.chats, conversationsVm.myUid) {

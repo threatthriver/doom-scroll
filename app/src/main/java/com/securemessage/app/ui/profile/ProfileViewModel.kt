@@ -9,6 +9,7 @@ import com.securemessage.app.data.repo.AuthRepository
 import com.securemessage.app.data.repo.UserRepository
 import com.securemessage.app.data.update.GitHubRelease
 import com.securemessage.app.data.update.GitHubUpdateManager
+import com.securemessage.app.data.update.UpdateNotifier
 import com.securemessage.app.data.update.UpdateState
 import com.securemessage.app.data.update.cleanReleaseNotes
 import kotlinx.coroutines.Job
@@ -169,10 +170,20 @@ class ProfileViewModel(
                                     downloadedApkFile = cached ?: it.downloadedApkFile,
                                 )
                             }
+                            // Silent finds feed the tray (manual ones already show a dialog).
+                            if (silent) {
+                                appContext?.let { ctx ->
+                                    if (UpdateNotifier.shouldNotifyFor(ctx, release.tagName)) {
+                                        UpdateNotifier.showUpdateAvailable(ctx, release)
+                                        UpdateNotifier.markNotifiedFor(ctx, release.tagName)
+                                    }
+                                }
+                            }
                         }
 
                         is UpdateState.UpToDate -> {
                             appContext?.let { markSilentChecked(it) }
+                            appContext?.let { UpdateNotifier.cancel(it) }
                             _state.update {
                                 it.copy(
                                     isCheckingUpdates = false,
@@ -267,6 +278,7 @@ class ProfileViewModel(
                                 userNotification = "Update downloaded. Opening the installer...",
                             )
                         }
+                        UpdateNotifier.showDownloadedReady(context.applicationContext, release)
                         val opened = GitHubUpdateManager.promptInstall(context, updateState.apkFile)
                         if (!opened) {
                             // Android first asks the user to allow installs from this app.

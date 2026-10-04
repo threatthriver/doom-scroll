@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -35,6 +36,8 @@ object GitHubUpdateManager {
     private const val CHECK_RETRY_BASE_DELAY_MS = 1_500L
     private const val DOWNLOAD_BUFFER_BYTES = 32 * 1024
     private const val PROGRESS_EMIT_INTERVAL_MS = 150L
+    private const val DOWNLOAD_MAX_ATTEMPTS = 3
+    private const val DOWNLOAD_RETRY_BASE_DELAY_MS = 2_000L
     private const val MIN_VALID_APK_BYTES = 1_000_000L
     // ZIP local-file-header magic ("PK\u0003\u0004"). Every valid APK starts with it.
     private const val ZIP_MAGIC_0: Byte = 0x50
@@ -180,9 +183,24 @@ object GitHubUpdateManager {
         }
 
         try {
-            downloadWithResume(downloadUrl, partFile, release) { downloaded, total ->
-                val progress = if (total > 0) downloaded.toFloat() / total else 0f
-                emit(UpdateState.Downloading(release, progress, downloaded, total))
+            // Retry the transfer itself (resume makes retries cheap: already-fetched
+            // bytes are kept). This is what saves slow/flaky mobile connections where
+            // a single stall would otherwise fail the whole 9 MB download.
+            var attempt = 0
+            while (true) {
+                try {
+                    downloadWithResume(downloadUrl, partFile, release) { downloaded, total ->
+                        val progress = if (total > 0) downloaded.toFloat() / total else 0f
+                        emit(UpdateState.Downloading(release, progress, downloaded, total))
+                    }
+                    break
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    attempt++
+                    if (attempt >= DOWNLOAD_MAX_ATTEMPTS) throw e
+                    delay(DOWNLOAD_RETRY_BASE_DELAY_MS * attempt)
+                }
             }
 
             // Only a fully downloaded + sane file becomes the real APK.
@@ -271,7 +289,10 @@ object GitHubUpdateManager {
                         }
                     }
                     output.flush()
-                    output.fd.sync()
+                    // Best-effort durability only: fd.sync() throws SyncFailedException
+                    // on filesystems without sync support (some emulated/external
+                    // storage), and that must never fail an otherwise good download.
+                    runCatching { output.fd.sync() }
                 }
             }
             onProgress(downloadedBytes, totalBytes)
