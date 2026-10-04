@@ -55,7 +55,9 @@ fun MainScreen(
     }
 
     val currentUser = FirebaseAuth.getInstance().currentUser
-    val displayName = currentUser?.displayName ?: "User"
+    // Firestore is the source of truth: the Auth profile copy is stale (often empty)
+    // because the app stores display names in the users doc, never in Auth.
+    val displayName = convState.myDisplayName.ifEmpty { currentUser?.displayName ?: "User" }
     val email = currentUser?.email ?: ""
     val uid = currentUser?.uid ?: ""
 

@@ -67,19 +67,31 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         awaitClose { reg.remove() }
     }
 
-    override suspend fun sendMessage(chatId: String, senderId: String, text: String): Result<Unit> = runCatching {
+    override suspend fun sendMessage(
+        chatId: String,
+        senderId: String,
+        text: String,
+        replyToId: String,
+        replyToText: String,
+        replyToSender: String,
+    ): Result<Unit> = runCatching {
         val chatRef = chats.document(chatId)
         val batch = db.batch()
         val msgRef = chatRef.collection("messages").document()
-        batch.set(
-            msgRef,
-            mapOf(
-                "text" to text,
-                "senderId" to senderId,
-                "timestamp" to FieldValue.serverTimestamp(),
-                "reactions" to emptyMap<String, String>(),
-            ),
+        val messageData = mutableMapOf<String, Any>(
+            "text" to text,
+            "senderId" to senderId,
+            "timestamp" to FieldValue.serverTimestamp(),
+            "reactions" to emptyMap<String, String>(),
         )
+        // Replies carry their quoted context inline so any client version can render
+        // them without a second read. (Message creates have no field allow-list.)
+        if (replyToId.isNotEmpty()) {
+            messageData["replyToId"] = replyToId
+            messageData["replyToText"] = replyToText.take(MAX_REPLY_QUOTE_CHARS)
+            messageData["replyToSender"] = replyToSender
+        }
+        batch.set(msgRef, messageData)
         // Increment unread count for other participants. Dot-notation paths update each
         // recipient's counter atomically without replacing the whole map (the old code
         // wrote the entire "unreadCount" map in one shot, which could wipe counters).
@@ -103,7 +115,38 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
     }.onFailure { Log.w(TAG, "sendMessage failed", it) }
 
     override suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit> = runCatching {
-        chats.document(chatId).collection("messages").document(messageId).delete().await()
+        val chatRef = chats.document(chatId)
+        val msgRef = chatRef.collection("messages").document(messageId)
+        val deletedText = msgRef.get().await().getString("text").orEmpty()
+        msgRef.delete().await()
+
+        // Keep the chat-list preview truthful: if the deleted message was the preview,
+        // fall back to the newest remaining message (or clear the preview entirely).
+        // Non-preview deletes skip the extra reads.
+        val chat = chatRef.get().await()
+        if (deletedText.isNotEmpty() && chat.getString("lastMessage") == deletedText) {
+            val latest = chatRef.collection("messages")
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(1)
+                .get().await().documents.firstOrNull()
+            if (latest == null) {
+                chatRef.update(
+                    mapOf(
+                        "lastMessage" to "",
+                        "lastSenderId" to "",
+                        "lastMessageAt" to FieldValue.delete(),
+                    )
+                ).await()
+            } else {
+                chatRef.update(
+                    mapOf(
+                        "lastMessage" to latest.getString("text").orEmpty(),
+                        "lastSenderId" to latest.getString("senderId").orEmpty(),
+                        "lastMessageAt" to (latest.getTimestamp("timestamp") ?: FieldValue.serverTimestamp()),
+                    )
+                ).await()
+            }
+        }
         Unit
     }.onFailure { Log.w(TAG, "deleteMessage failed", it) }
 
@@ -151,10 +194,12 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
     }.onFailure { Log.w(TAG, "toggleArchive failed", it) }
 
     override suspend fun loadMoreMessages(chatId: String, beforeTimestamp: Timestamp, limit: Int): Result<List<Message>> = runCatching {
+        // limitToLast (not limit): with ascending order, limit() would return the FIRST
+        // N messages overall instead of the N immediately preceding the cursor.
         chats.document(chatId).collection("messages")
             .orderBy("timestamp")
             .endBefore(beforeTimestamp)
-            .limit(limit.toLong())
+            .limitToLast(limit.toLong())
             .get().await()
             .documents.map { it.toMessage() }
     }.onFailure { Log.w(TAG, "loadMoreMessages failed", it) }
@@ -178,9 +223,14 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         senderId = getString("senderId").orEmpty(),
         timestamp = getTimestamp("timestamp", ServerTimestampBehavior.ESTIMATE),
         reactions = FirestoreCoerce.stringMap(get("reactions")),
+        replyToId = getString("replyToId").orEmpty(),
+        replyToText = getString("replyToText").orEmpty(),
+        replyToSender = getString("replyToSender").orEmpty(),
     )
 
     private companion object {
         const val TAG = "ChatRepo"
+        /** Quoted reply preview is capped so one reply can't balloon a message doc. */
+        const val MAX_REPLY_QUOTE_CHARS = 300
     }
 }

@@ -33,6 +33,8 @@ data class ChatUiState(
 
 const val MAX_MESSAGE_LENGTH = 2000
 const val MESSAGE_PAGE_SIZE = 50
+/** Quoted reply preview cap, mirrored by the repository write path. */
+const val MAX_REPLY_QUOTE_CHARS = 300
 private const val ENCRYPTION_INIT_ATTEMPTS = 4
 private const val ENCRYPTION_RETRY_DELAY_MS = 1500L
 private const val MARK_READ_THROTTLE_MS = 5_000L
@@ -143,7 +145,7 @@ class ChatViewModel(
 
     fun onDraftChange(v: String) = _state.update { it.copy(draft = v) }
 
-    fun send() {
+    fun send(replyTo: Message? = null) {
         val original = _state.value.draft
         val text = original.trim()
         val uid = myUid ?: return
@@ -152,7 +154,7 @@ class ChatViewModel(
             _state.update { it.copy(userMessage = "Message is too long (max $MAX_MESSAGE_LENGTH)") }
             return
         }
-        
+
         // Encrypt the message if we have an encryption key
         val textToSend = if (encryptionKey != null) {
             try {
@@ -164,10 +166,16 @@ class ChatViewModel(
         } else {
             text
         }
-        
+
+        // Replies quote the original (capped) so the thread survives decryption and
+        // history loads. Sender label resolves at render time from participant names.
+        val replyId = replyTo?.id.orEmpty()
+        val replyText = replyTo?.text?.take(MAX_REPLY_QUOTE_CHARS).orEmpty()
+        val replySender = replyTo?.senderId.orEmpty()
+
         _state.update { it.copy(draft = "") }
         viewModelScope.launch {
-            chatRepo.sendMessage(chatId, uid, textToSend).onFailure {
+            chatRepo.sendMessage(chatId, uid, textToSend, replyId, replyText, replySender).onFailure {
                 _state.update { it.copy(draft = original, userMessage = "Couldn't send message") }
             }
         }

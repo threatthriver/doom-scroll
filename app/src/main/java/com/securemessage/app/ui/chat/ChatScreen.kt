@@ -352,6 +352,7 @@ fun ChatScreen(
                                 isMine = isMine,
                                 userReaction = userReaction,
                                 reactionCount = reactionCount,
+                                replySenderName = if (msg.replyToSender == myUid) "You" else state.title,
                                 onTap = {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     selectedMessageForMenu = msg
@@ -512,7 +513,7 @@ fun ChatScreen(
                                     onSend = {
                                         if (state.draft.isNotBlank()) {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                            vm.send()
+                                            vm.send(replyingToMessage)
                                             replyingToMessage = null
                                         }
                                     },
@@ -545,7 +546,7 @@ fun ChatScreen(
                             .clickable {
                                 if (state.draft.isNotBlank()) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    vm.send()
+                                    vm.send(replyingToMessage)
                                     replyingToMessage = null
                                 } else {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -640,6 +641,7 @@ private fun TelegramMessageBubble(
     isMine: Boolean,
     userReaction: String?,
     reactionCount: Int,
+    replySenderName: String = "",
     onTap: () -> Unit,
     onLongPress: () -> Unit,
 ) {
@@ -662,7 +664,7 @@ private fun TelegramMessageBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isMine) Alignment.End else Alignment.Start,
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .widthIn(min = 80.dp, max = 290.dp)
                 .clip(bubbleShape)
@@ -672,8 +674,42 @@ private fun TelegramMessageBubble(
                     onLongClick = onLongPress,
                 )
                 .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.Bottom,
         ) {
+            // Quoted reply context — renders from the stored snapshot, no extra read.
+            if (message.replyToText.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(metaColor),
+                    )
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
+                        Text(
+                            text = replySenderName.ifEmpty { "Reply" },
+                            color = metaColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = message.replyToText,
+                            color = textColor.copy(alpha = 0.85f),
+                            fontSize = 13.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.Bottom,
+            ) {
             Text(
                 text = message.text,
                 color = textColor,
@@ -701,6 +737,7 @@ private fun TelegramMessageBubble(
                     )
                 }
             }
+        }
         }
 
         if (reactionCount > 0) {

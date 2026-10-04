@@ -16,6 +16,7 @@ import com.securemessage.app.ui.auth.REASON_PROFILE_FAILED
 import com.securemessage.app.ui.auth.REASON_USERNAME_TAKEN
 import com.securemessage.app.ui.chat.ChatViewModel
 import com.securemessage.app.ui.conversations.ConversationsViewModel
+import com.securemessage.app.ui.profile.ProfileViewModel
 import com.securemessage.app.ui.users.UserSearchViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
@@ -223,6 +224,20 @@ class ConversationsViewModelTest {
         val chat = Chat("c", listOf("me", "bob"))
         assertEquals(0, v.unreadCountFor(chat))
     }
+
+    @Test fun myDisplayNameComesFromFirestoreProfile() = runTest {
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        advanceUntilIdle()
+        assertEquals("Me", v.state.value.myDisplayName)
+    }
+
+    @Test fun missingProfileLeavesDisplayNameEmpty() = runTest {
+        users.getUserResult = Result.failure(NoSuchElementException())
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        advanceUntilIdle()
+        assertTrue(v.state.value.myDisplayName.isEmpty())
+        assertTrue(v.state.value.needsProfile)
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -285,6 +300,43 @@ class UserSearchViewModelTest {
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
+class ProfileEditValidationTest {
+    @get:Rule val main = MainDispatcherRule()
+    private val users = FakeUserRepository()
+    private fun vm() = ProfileViewModel(FakeAuthRepository(), users)
+
+    @Test fun blankNameIsRejectedWithoutRepoCall() = runTest {
+        var calls = 0
+        val counting = object : com.securemessage.app.data.repo.UserRepository by users {
+            override suspend fun updateProfile(uid: String, displayName: String, bio: String, photoUrl: String): Result<Unit> {
+                calls++
+                return Result.success(Unit)
+            }
+        }
+        val v = ProfileViewModel(FakeAuthRepository(), counting)
+        v.updateProfile("   ", "bio"); advanceUntilIdle()
+        assertEquals(0, calls)
+        assertEquals("Enter a name", v.state.value.userNotification)
+    }
+
+    @Test fun overlongNameAndBioAreRejected() = runTest {
+        val v = vm()
+        v.updateProfile("x".repeat(51), ""); advanceUntilIdle()
+        assertEquals("Name must be at most 50 characters", v.state.value.userNotification)
+        v.updateProfile("Ok", "x".repeat(161)); advanceUntilIdle()
+        assertEquals("Bio must be at most 160 characters", v.state.value.userNotification)
+    }
+
+    @Test fun validEditTrimsAndSaves() = runTest {
+        val v = vm()
+        v.updateProfile("  Alice  ", "  hi  "); advanceUntilIdle()
+        assertEquals("Alice", v.state.value.displayName)
+        assertEquals("hi", v.state.value.bio)
+        assertEquals("Profile saved", v.state.value.userNotification)
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
     @get:Rule val main = MainDispatcherRule()
     private val chats = FakeChatRepository()
@@ -313,6 +365,20 @@ class ChatViewModelTest {
         v.onDraftChange(" hi "); v.send(); advanceUntilIdle()
         assertEquals(listOf("hi"), chats.sent)
         assertEquals("", v.state.value.draft)
+    }
+
+    @Test fun plainSendCarriesNoReply() = runTest {
+        val v = vm()
+        v.onDraftChange("hi"); v.send(); advanceUntilIdle()
+        assertEquals(listOf(Triple("", "", "")), chats.sentReplies)
+    }
+
+    @Test fun replySendQuotesOriginal() = runTest {
+        val v = vm()
+        v.onDraftChange("answer"); v.send(com.securemessage.app.data.model.Message("m1", "question", "bob"))
+        advanceUntilIdle()
+        assertEquals(listOf("answer"), chats.sent)
+        assertEquals(listOf(Triple("m1", "question", "bob")), chats.sentReplies)
     }
 
     @Test fun failureRestoresDraft() = runTest {

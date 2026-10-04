@@ -8,4 +8,8 @@ data class Message(
     val senderId: String = "",
     val timestamp: Timestamp? = null,
     val reactions: Map<String, String> = emptyMap(), // userId -> emoji
+    /** Quoted context for replies. Empty when the message is not a reply. */
+    val replyToId: String = "",
+    val replyToText: String = "",
+    val replyToSender: String = "",
 )

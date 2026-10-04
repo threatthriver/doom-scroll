@@ -20,6 +20,8 @@ data class ConversationsUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val needsProfile: Boolean = false,
+    /** Our own Firestore display name (FirebaseAuth's copy is stale/empty). */
+    val myDisplayName: String = "",
 ) {
     val archivedCount: Int get() = archivedChats.size
 }
@@ -30,7 +32,8 @@ class ConversationsViewModel(
     private val userRepo: UserRepository,
 ) : ViewModel() {
 
-    val myUid: String? = authRepo.currentUserId
+    /** Read live: the cached-uid version went stale across sign-out/sign-in. */
+    val myUid: String? get() = authRepo.currentUserId
 
     private val _state = MutableStateFlow(ConversationsUiState(isLoading = myUid != null))
     val state: StateFlow<ConversationsUiState> = _state.asStateFlow()
@@ -41,9 +44,17 @@ class ConversationsViewModel(
     init {
         myUid?.let { uid ->
             viewModelScope.launch {
-                if (userRepo.getUser(uid).exceptionOrNull() is NoSuchElementException) {
-                    _state.update { it.copy(needsProfile = true) }
-                }
+                userRepo.getUser(uid)
+                    .onSuccess { user ->
+                        _state.update {
+                            it.copy(needsProfile = false, myDisplayName = user.displayName)
+                        }
+                    }
+                    .onFailure { e ->
+                        if (e is NoSuchElementException) {
+                            _state.update { it.copy(needsProfile = true) }
+                        }
+                    }
             }
             viewModelScope.launch {
                 chatRepo.observeChats(uid)

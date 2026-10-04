@@ -27,10 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.securemessage.app.data.crypto.E2EEncryption
+import com.securemessage.app.data.crypto.KeyStoreManager
 import com.securemessage.app.ui.common.AppViewModelFactory
 import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.theme.HairlineBorder
@@ -110,10 +109,14 @@ fun ProfileScreen(
         .joinToString("")
         .ifEmpty { effectiveName.take(2).uppercase() }
 
+    // Real E2EE identity fingerprint (same safety-number style as the chat header
+    // "Check security code" row), not a display hash. Falls back gracefully when
+    // the Keystore is unreachable.
     val keyFingerprint = remember(effectiveUid) {
-        val hash = (effectiveUid + "DOOM_SCROLL_SALT").hashCode()
-        val hex = Integer.toHexString(hash).uppercase().padStart(8, '0')
-        "${hex.substring(0, 4)} : ${hex.substring(4, 8)} : SEC-V4"
+        runCatching {
+            val pub = KeyStoreManager.getIdentityPublicKey(context)
+            E2EEncryption.computeFingerprint(pub.encoded).chunked(4).joinToString(" : ")
+        }.getOrElse { "Unavailable" }
     }
 
     Box(
@@ -525,8 +528,9 @@ fun ProfileScreen(
                 Button(
                     onClick = {
                         showEditDialog = false
-                        onEditProfile(editDisplayName, editBio)
-                        Toast.makeText(context, "Profile updated", Toast.LENGTH_SHORT).show()
+                        // Saved for real through the shared ProfileViewModel (which
+                        // reports success/failure). Previously this only toasted.
+                        vm.updateProfile(editDisplayName, editBio)
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = PureWhite,

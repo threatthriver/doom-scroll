@@ -58,6 +58,7 @@ class FakeChatRepository : ChatRepository {
     var toggleArchiveResult: Result<Unit> = Result.success(Unit)
     var loadMoreResult: Result<List<Message>> = Result.success(emptyList())
     val sent = mutableListOf<String>()
+    val sentReplies = mutableListOf<Triple<String, String, String>>()
     val deleted = mutableListOf<String>()
     val reactions = mutableListOf<Triple<String, String, String>>()
     val readMarked = mutableListOf<String>()
@@ -69,8 +70,16 @@ class FakeChatRepository : ChatRepository {
     override suspend fun openChat(me: User, other: User): Result<String> = openResult
     override suspend fun getChat(chatId: String): Result<Chat> = getChatResult
     override fun observeMessages(chatId: String): Flow<List<Message>> = messages
-    override suspend fun sendMessage(chatId: String, senderId: String, text: String): Result<Unit> {
+    override suspend fun sendMessage(
+        chatId: String,
+        senderId: String,
+        text: String,
+        replyToId: String,
+        replyToText: String,
+        replyToSender: String
+    ): Result<Unit> {
         sent += text
+        sentReplies += Triple(replyToId, replyToText, replyToSender)
         return sendResult
     }
     override suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit> {

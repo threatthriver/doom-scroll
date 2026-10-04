@@ -10,7 +10,14 @@ interface ChatRepository {
     suspend fun openChat(me: User, other: User): Result<String>
     suspend fun getChat(chatId: String): Result<Chat>
     fun observeMessages(chatId: String): Flow<List<Message>>
-    suspend fun sendMessage(chatId: String, senderId: String, text: String): Result<Unit>
+    suspend fun sendMessage(
+        chatId: String,
+        senderId: String,
+        text: String,
+        replyToId: String = "",
+        replyToText: String = "",
+        replyToSender: String = "",
+    ): Result<Unit>
     suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit>
     suspend fun addReaction(chatId: String, messageId: String, userId: String, emoji: String): Result<Unit>
     suspend fun removeReaction(chatId: String, messageId: String, userId: String): Result<Unit>

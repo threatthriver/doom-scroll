@@ -97,15 +97,28 @@ class ProfileViewModel(
 
     fun updateProfile(displayName: String, bio: String) {
         val uid = authRepo.currentUserId ?: return
+        // Same caps as sign-up so edits can't smuggle in what sign-up rejects.
+        val name = displayName.trim()
+        val cleanBio = bio.trim()
+        val error = when {
+            name.isEmpty() -> "Enter a name"
+            name.length > MAX_DISPLAY_NAME -> "Name must be at most $MAX_DISPLAY_NAME characters"
+            cleanBio.length > MAX_BIO -> "Bio must be at most $MAX_BIO characters"
+            else -> null
+        }
+        if (error != null) {
+            _state.update { it.copy(userNotification = error) }
+            return
+        }
         _state.update { it.copy(isLoading = true) }
 
         viewModelScope.launch {
-            userRepo.updateProfile(uid, displayName, bio, _state.value.photoUrl)
+            userRepo.updateProfile(uid, name, cleanBio, _state.value.photoUrl)
                 .onSuccess {
                     _state.update {
                         it.copy(
-                            displayName = displayName,
-                            bio = bio,
+                            displayName = name,
+                            bio = cleanBio,
                             isLoading = false,
                             userNotification = "Profile saved",
                         )
@@ -387,5 +400,8 @@ class ProfileViewModel(
         private const val KEY_LAST_SILENT_CHECK = "last_silent_check_ms"
         /** Silent auto-checks hit the network at most once per 6h; manual taps always check. */
         private const val SILENT_CHECK_COOLDOWN_MS = 6 * 60 * 60 * 1000L
+        /** Mirrors sign-up caps so edits can't smuggle in what sign-up rejects. */
+        const val MAX_DISPLAY_NAME = 50
+        const val MAX_BIO = 160
     }
 }

@@ -35,11 +35,11 @@ android {
         applicationId = "com.securemessage.app"
         minSdk = 24
         targetSdk = 35
-        // Keep this in sync with the GitHub release tag (v1.3.0). The updater compares
+        // Keep this in sync with the GitHub release tag (v1.3.1). The updater compares
         // this version with the latest release tag, so a mismatch makes it offer the
         // same update again and again.
-        versionCode = 6
-        versionName = "1.3.0"
+        versionCode = 7
+        versionName = "1.3.1"
     }
 
     buildTypes {
