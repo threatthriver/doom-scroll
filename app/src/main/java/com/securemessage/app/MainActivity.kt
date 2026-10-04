@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.securemessage.app.data.notify.MessageNotifier
 import com.securemessage.app.data.update.GitHubUpdateManager
 import com.securemessage.app.data.update.UpdateNotifier
 import com.securemessage.app.data.update.UpdateNotifier.EXTRA_OPEN_UPDATES
@@ -27,6 +28,9 @@ class MainActivity : ComponentActivity() {
     /** True when the activity was opened from the update notification (cold start or tap). */
     private var openUpdatesRequested by mutableStateOf(false)
 
+    /** Chat to open when launched from a message notification (cold start or tap). */
+    private var openChatRequested by mutableStateOf<String?>(null)
+
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
             // Result is intentionally ignored: if granted, the next update check notifies;
@@ -37,12 +41,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         openUpdatesRequested = intent?.getBooleanExtra(EXTRA_OPEN_UPDATES, false) == true
+        openChatRequested = intent?.getStringExtra(MessageNotifier.EXTRA_OPEN_CHAT)
         maybeRequestNotificationPermission()
         checkUpdatesForTray()
         val container = (application as SecureMessageApp).container
         setContent {
             SecureMessageTheme {
-                AppNavHost(container, openUpdates = openUpdatesRequested)
+                AppNavHost(
+                    container,
+                    openUpdates = openUpdatesRequested,
+                    openChatId = openChatRequested
+                )
             }
         }
     }
@@ -50,10 +59,13 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // singleTop: tapping the notification while the app is open re-routes to Settings.
+        // singleTop: tapping a notification while the app is open re-routes in place.
         if (intent.getBooleanExtra(EXTRA_OPEN_UPDATES, false)) {
             UpdateNotifier.cancel(this)
             openUpdatesRequested = true
+        }
+        intent.getStringExtra(MessageNotifier.EXTRA_OPEN_CHAT)?.let { chatId ->
+            openChatRequested = chatId
         }
     }
 

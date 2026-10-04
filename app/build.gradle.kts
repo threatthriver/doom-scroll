@@ -35,11 +35,11 @@ android {
         applicationId = "com.securemessage.app"
         minSdk = 24
         targetSdk = 35
-        // Keep this in sync with the GitHub release tag (v1.2.2). The updater compares
+        // Keep this in sync with the GitHub release tag (v1.3.0). The updater compares
         // this version with the latest release tag, so a mismatch makes it offer the
         // same update again and again.
-        versionCode = 5
-        versionName = "1.2.2"
+        versionCode = 6
+        versionName = "1.3.0"
     }
 
     buildTypes {
@@ -102,6 +102,9 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.bouncy.castle)
     implementation(libs.androidx.biometric)
+    // Pinned so lintVitalRelease (InvalidFragmentVersionForActivityResult) is happy
+    // with ComponentActivity's registerForActivityResult on all build types.
+    implementation(libs.androidx.fragment.ktx)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

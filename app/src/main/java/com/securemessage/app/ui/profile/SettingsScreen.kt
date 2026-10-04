@@ -277,7 +277,7 @@ fun SettingsScreen(
                         // weight(1f) is what keeps the button from being squeezed
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Doom Scroll updates",
+                                text = "Chat updates",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = PureWhite,

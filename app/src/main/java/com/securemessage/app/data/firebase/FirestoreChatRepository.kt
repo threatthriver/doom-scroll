@@ -92,6 +92,7 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         val metadata = mutableMapOf<String, Any>(
             "lastMessage" to text,
             "lastMessageAt" to FieldValue.serverTimestamp(),
+            "lastSenderId" to senderId,
         )
         participants.forEach { uid ->
             metadata["unreadCount.$uid"] = FieldValue.increment(1)
@@ -164,6 +165,7 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         participantNames = FirestoreCoerce.stringMap(get("participantNames")),
         lastMessage = getString("lastMessage").orEmpty(),
         lastMessageAt = getTimestamp("lastMessageAt", ServerTimestampBehavior.ESTIMATE),
+        lastSenderId = getString("lastSenderId").orEmpty(),
         unreadCount = FirestoreCoerce.intMap(get("unreadCount")),
         muted = FirestoreCoerce.booleanMap(get("muted")),
         pinned = FirestoreCoerce.bool(get("pinned")),

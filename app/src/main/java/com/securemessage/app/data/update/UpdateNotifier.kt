@@ -35,7 +35,7 @@ object UpdateNotifier {
             "App updates",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Notifies when a new Doom Scroll version is ready to install"
+            description = "Notifies when a new Chat version is ready to install"
         }
         manager.createNotificationChannel(channel)
     }
@@ -71,7 +71,7 @@ object UpdateNotifier {
         val version = release.tagName.removePrefix("v").removePrefix("V")
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("Doom Scroll $version is ready")
+            .setContentTitle("Chat $version is ready")
             .setContentText("Tap to open updates and install the new version.")
             .setStyle(
                 NotificationCompat.BigTextStyle()

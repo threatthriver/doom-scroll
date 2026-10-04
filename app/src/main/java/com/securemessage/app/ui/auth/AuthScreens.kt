@@ -99,14 +99,14 @@ internal fun AuthScaffold(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Lock,
-                        contentDescription = "Doom Scroll",
+                        contentDescription = "Chat",
                         tint = PureBlack,
                         modifier = Modifier.size(22.dp),
                     )
                 }
                 Column {
                     Text(
-                        text = "DOOM SCROLL",
+                        text = "CHAT",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.SansSerif,

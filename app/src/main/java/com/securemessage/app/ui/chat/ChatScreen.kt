@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -70,6 +71,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -97,6 +99,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.securemessage.app.data.model.Message
+import com.securemessage.app.data.notify.MessageNotifier
 import com.securemessage.app.ui.common.AppViewModelFactory
 import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.common.formatTime
@@ -171,6 +174,14 @@ fun ChatScreen(
         if (listState.firstVisibleItemIndex <= 2 && !state.isLoadingMore && state.hasMoreMessages) {
             vm.loadMoreMessages()
         }
+    }
+
+    // Presence for the tray notifier: no buzz for the chat on screen, and opening
+    // the chat clears its pending notification.
+    DisposableEffect(vm.chatId) {
+        OpenChatTracker.entered(vm.chatId)
+        MessageNotifier.cancelFor(context, vm.chatId)
+        onDispose { OpenChatTracker.exited(vm.chatId) }
     }
 
     val initials = state.title.split(" ")
@@ -326,7 +337,9 @@ fun ChatScreen(
                             !isSameDay(previous.timestamp, msg.timestamp)
 
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem(),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             // One divider per calendar day, instead of a single hard-coded "TODAY"
@@ -541,12 +554,17 @@ fun ChatScreen(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = if (state.draft.isNotBlank()) Icons.AutoMirrored.Filled.Send else Icons.Filled.Mic,
-                            contentDescription = if (state.draft.isNotBlank()) "Send" else "Record Audio",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp),
-                        )
+                        AnimatedContent(
+                            targetState = state.draft.isNotBlank(),
+                            label = "send_mic_swap",
+                        ) { hasText ->
+                            Icon(
+                                imageVector = if (hasText) Icons.AutoMirrored.Filled.Send else Icons.Filled.Mic,
+                                contentDescription = if (hasText) "Send" else "Record Audio",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                     }
                 }
             }

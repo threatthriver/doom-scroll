@@ -8,6 +8,8 @@ data class Chat(
     val participantNames: Map<String, String> = emptyMap(),
     val lastMessage: String = "",
     val lastMessageAt: Timestamp? = null,
+    /** Sender of [lastMessage]; drives tray notifications. Empty on pre-1.3.0 chats. */
+    val lastSenderId: String = "",
     val unreadCount: Map<String, Int> = emptyMap(), // userId -> count
     val muted: Map<String, Boolean> = emptyMap(), // userId -> muted
     val pinned: Boolean = false,

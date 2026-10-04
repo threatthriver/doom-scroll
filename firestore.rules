@@ -41,7 +41,7 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && request.auth.uid in resource.data.participants
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['lastMessage', 'lastMessageAt', 'unreadCount', 'muted', 'pinned', 'archived', 'participantNames']);
+            .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'unreadCount', 'muted', 'pinned', 'archived', 'participantNames']);
 
       // Messages inherit access from the parent chat's participants.
       match /messages/{messageId} {

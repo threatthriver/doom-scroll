@@ -100,7 +100,7 @@ fun ProfileScreen(
     }
 
     val effectiveName = state.displayName.ifEmpty { displayName.ifEmpty { "User" } }
-    val effectiveEmail = state.email.ifEmpty { email.ifEmpty { "node@doomscroll.sec" } }
+    val effectiveEmail = state.email.ifEmpty { email.ifEmpty { "no email" } }
     val effectiveUid = state.uid.ifEmpty { uid }
     val effectiveBio = state.bio
 

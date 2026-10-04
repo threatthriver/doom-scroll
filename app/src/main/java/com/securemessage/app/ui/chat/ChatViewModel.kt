@@ -45,7 +45,7 @@ class ChatViewModel(
     private val context: Context? = null,
 ) : ViewModel() {
 
-    private val chatId: String = checkNotNull(savedStateHandle["chatId"])
+    val chatId: String = checkNotNull(savedStateHandle["chatId"])
     val myUid: String? = authRepo.currentUserId
 
     private val _state = MutableStateFlow(ChatUiState())

@@ -143,7 +143,7 @@ fun ConversationsScreen(
                         )
                     }
                     Text(
-                        text = "Doom Scroll",
+                        text = "Chat",
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,

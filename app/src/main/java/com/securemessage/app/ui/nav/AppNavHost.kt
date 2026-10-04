@@ -1,6 +1,12 @@
 package com.securemessage.app.ui.nav
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -22,10 +28,22 @@ private fun NavHostController.navigateClearing(route: String) =
     navigate(route) { popUpTo(graph.id) { inclusive = true } }
 
 @Composable
-fun AppNavHost(container: AppContainer, openUpdates: Boolean = false) {
+fun AppNavHost(
+    container: AppContainer,
+    openUpdates: Boolean = false,
+    // Chat to open from a message notification tap. Ignored when signed out.
+    openChatId: String? = null,
+) {
     val nav = rememberNavController()
     val start = remember {
         if (container.firebaseAuth.currentUser != null) Routes.CONVERSATIONS else Routes.SIGN_IN
+    }
+
+    // Deep-link from the tray: jump straight into the chat once the graph is ready.
+    LaunchedEffect(openChatId, start) {
+        if (openChatId != null && start == Routes.CONVERSATIONS) {
+            nav.navigate(Routes.chat(openChatId))
+        }
     }
 
     NavHost(navController = nav, startDestination = start) {
@@ -81,6 +99,30 @@ fun AppNavHost(container: AppContainer, openUpdates: Boolean = false) {
         composable(
             Routes.CHAT,
             arguments = listOf(navArgument("chatId") { type = NavType.StringType }),
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { it },
+                    animationSpec = tween(280)
+                ) + fadeIn(animationSpec = tween(220))
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { it / 3 },
+                    animationSpec = tween(260)
+                ) + fadeOut(animationSpec = tween(200))
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { -it / 3 },
+                    animationSpec = tween(260)
+                ) + fadeIn(animationSpec = tween(200))
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { it },
+                    animationSpec = tween(280)
+                ) + fadeOut(animationSpec = tween(220))
+            },
         ) {
             ChatScreen(onBack = { nav.popBackStack() })
         }
