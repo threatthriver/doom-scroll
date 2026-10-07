@@ -49,6 +49,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -225,7 +229,8 @@ fun SettingsScreen(
                         subtitle = "Show who wrote and what (hidden on lock screen)",
                         iconColor = SettingsIconGreen,
                         onClick = { toggleNotifPreview() },
-                        trailing = { Switch(checked = notifPreview, onCheckedChange = { toggleNotifPreview() }) },
+                        toggleState = notifPreview,
+                        trailing = { Switch(checked = notifPreview, onCheckedChange = null) },
                     )
                     RowDivider()
                     SettingsRow(
@@ -234,7 +239,8 @@ fun SettingsScreen(
                         subtitle = "Ask for fingerprint, face or screen lock",
                         iconColor = SettingsIconOrange,
                         onClick = { toggleAppLock() },
-                        trailing = { Switch(checked = appLock, onCheckedChange = { toggleAppLock() }) },
+                        toggleState = appLock,
+                        trailing = { Switch(checked = appLock, onCheckedChange = null) },
                     )
                     RowDivider()
                     SettingsRow(
@@ -243,10 +249,11 @@ fun SettingsScreen(
                         subtitle = "Block screenshots and hide app preview",
                         iconColor = SettingsIconIndigo,
                         onClick = { toggleScreenSecurity() },
+                        toggleState = screenSecurity,
                         trailing = {
                             Switch(
                                 checked = screenSecurity,
-                                onCheckedChange = { toggleScreenSecurity() },
+                                onCheckedChange = null,
                             )
                         },
                     )
@@ -611,10 +618,23 @@ private fun SettingsRow(
     iconColor: Color,
     onClick: () -> Unit,
     trailing: (@Composable () -> Unit)? = null,
+    /** When non-null, the whole row acts as a switch: it reports Role.Switch + on/off state to
+     *  screen readers, and the trailing Switch should be decorative (onCheckedChange = null) so a
+     *  single tap doesn't toggle twice. */
+    toggleState: Boolean? = null,
 ) {
+    val rowSemantics = if (toggleState != null) {
+        Modifier.semantics {
+            role = Role.Switch
+            stateDescription = if (toggleState) "On" else "Off"
+        }
+    } else {
+        Modifier
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(rowSemantics)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,

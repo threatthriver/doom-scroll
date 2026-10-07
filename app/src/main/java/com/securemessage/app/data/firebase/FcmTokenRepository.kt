@@ -22,7 +22,10 @@ class FcmTokenRepository(
     }.onFailure { Log.w(TAG, "registerCurrentToken failed: ${it.javaClass.simpleName}") }
 
     override suspend fun register(token: String): Result<Unit> = runCatching {
-        val uid = auth.currentUser?.uid ?: return@runCatching
+        // No signed-in user means there is nothing to register against. Fail explicitly so callers
+        // don't treat a no-op as a successful registration (which previously hid the fact that no
+        // token was ever written).
+        val uid = auth.currentUser?.uid ?: error("Not signed in")
         require(token.isNotBlank() && '/' !in token) { "Invalid token" }
         tokenDoc(uid, token).set(
             mapOf("createdAt" to FieldValue.serverTimestamp(), "platform" to "android"),
@@ -33,9 +36,14 @@ class FcmTokenRepository(
     override suspend fun unregister(): Result<Unit> = runCatching {
         val uid = auth.currentUser?.uid
         val fcm = messaging()
+        // Delete the server-side token FIRST (this needs auth), so a signed-out device stops
+        // receiving pushes. Only then rotate the device token locally. If there's no uid we can't
+        // touch Firestore — log it rather than silently leaving a stale token that keeps alerting.
         if (uid != null) {
-            val token = fcm.token.await()
-            tokenDoc(uid, token).delete().await()
+            val token = runCatching { fcm.token.await() }.getOrNull()
+            if (token != null) tokenDoc(uid, token).delete().await()
+        } else {
+            Log.w(TAG, "unregister with no signed-in user: server token may remain until overwritten")
         }
         fcm.deleteToken().await()
         Unit

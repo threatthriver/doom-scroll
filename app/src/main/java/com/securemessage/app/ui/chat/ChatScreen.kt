@@ -78,6 +78,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -162,7 +165,10 @@ fun ChatScreen(
     val newestId = rows.firstOrNull()?.message?.id
     val newestIsMine = rows.firstOrNull()?.message?.senderId == myUid
     LaunchedEffect(newestId) {
-        if (newestId != null && (newestIsMine || listState.firstVisibleItemIndex <= 1)) {
+        // Only follow a new message to the bottom when the user is already parked at the newest
+        // message, or they sent it. The previous `<= 1` threshold would yank the list down while
+        // someone was deliberately reading one message up.
+        if (newestId != null && (newestIsMine || listState.firstVisibleItemIndex == 0)) {
             listState.animateScrollToItem(0)
         }
     }
@@ -343,7 +349,7 @@ fun ChatScreen(
                     }
                     if (query.isNotBlank()) {
                         Text(
-                            text = "${visibleMessages.size} found",
+                            text = "${visibleMessages.size} in view",
                             fontSize = 12.sp,
                             color = TextSecondary,
                             modifier = Modifier.padding(horizontal = 6.dp),
@@ -352,6 +358,16 @@ fun ChatScreen(
                     IconButton(onClick = { searchQuery = null }) {
                         Icon(Icons.Filled.Close, contentDescription = "Close search", tint = TextPrimary)
                     }
+                }
+                // Be honest that search only covers the messages decrypted on this device so far.
+                // Full-history search would need every message pulled and decrypted locally.
+                if (query.isNotBlank() && state.hasMoreMessages) {
+                    Text(
+                        text = "Only searching loaded messages. Scroll up to load older history.",
+                        fontSize = 11.sp,
+                        color = TextMuted,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+                    )
                 }
                 Spacer(Modifier.height(6.dp))
             }
@@ -435,7 +451,62 @@ fun ChatScreen(
                         }
                     }
 
-                    if (state.messages.isEmpty() && !state.isLoadingMore) {
+                    // First-load spinner: shown until the first snapshot arrives, so the empty
+                    // card never flashes on a chat that actually has history.
+                    if (state.isLoading && state.messages.isEmpty()) {
+                        item(key = "loading") {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(
+                                    color = TgLink,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(30.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    // Load/permission/network error: say something instead of a silent blank list.
+                    if (state.error != null && state.messages.isEmpty() && !state.isLoading) {
+                        item(key = "error_hint") {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = null,
+                                        tint = TgErrorRed,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                    Text(
+                                        text = "Couldn't load messages",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White,
+                                    )
+                                    Text(
+                                        text = state.error ?: "Check your connection and try again.",
+                                        fontSize = 13.sp,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (state.messages.isEmpty() && !state.isLoadingMore && !state.isLoading && state.error == null) {
                         item(key = "empty_hint") {
                             Box(
                                 modifier = Modifier
@@ -975,8 +1046,12 @@ private fun TelegramMessageActionDialog(
                         text = emoji,
                         fontSize = 22.sp,
                         modifier = Modifier
-                            .clickable { onReact(emoji) }
-                            .padding(4.dp),
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = "React with $emoji",
+                            ) { onReact(emoji) }
+                            .padding(4.dp)
+                            .semantics { contentDescription = "React with $emoji" },
                     )
                 }
             }
@@ -1017,7 +1092,7 @@ private fun TelegramMenuRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClickLabel = title, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),

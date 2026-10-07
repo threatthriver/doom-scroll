@@ -371,20 +371,9 @@ class ProfileViewModel(
         }
     }
 
-    private fun shouldSilentCheck(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_UPDATES, Context.MODE_PRIVATE)
-        val last = prefs.getLong(KEY_LAST_SILENT_CHECK, 0L)
-        return System.currentTimeMillis() - last >= SILENT_CHECK_COOLDOWN_MS
-    }
+    private fun shouldSilentCheck(context: Context): Boolean = Companion.shouldSilentCheck(context)
 
-    private fun markSilentChecked(context: Context) {
-        try {
-            context.getSharedPreferences(PREFS_UPDATES, Context.MODE_PRIVATE)
-                .edit().putLong(KEY_LAST_SILENT_CHECK, System.currentTimeMillis()).apply()
-        } catch (_: Exception) {
-            // Prefs failure must never break the update flow.
-        }
-    }
+    private fun markSilentChecked(context: Context) = Companion.markSilentChecked(context)
 
     fun dismissNotification() {
         _state.update { it.copy(userNotification = null) }
@@ -406,5 +395,26 @@ class ProfileViewModel(
         /** Mirrors sign-up caps so edits can't smuggle in what sign-up rejects. */
         const val MAX_DISPLAY_NAME = 50
         const val MAX_BIO = 160
+
+        /**
+         * Shared 6h silent-check cool-down, persisted across restarts. Both the Settings card
+         * (ProfileViewModel) and the app-start tray check (MainActivity) consult this single
+         * timestamp so they don't each hit the GitHub API on every cold start or race to post the
+         * same tray notification.
+         */
+        fun shouldSilentCheck(context: Context): Boolean {
+            val prefs = context.getSharedPreferences(PREFS_UPDATES, Context.MODE_PRIVATE)
+            val last = prefs.getLong(KEY_LAST_SILENT_CHECK, 0L)
+            return System.currentTimeMillis() - last >= SILENT_CHECK_COOLDOWN_MS
+        }
+
+        fun markSilentChecked(context: Context) {
+            try {
+                context.getSharedPreferences(PREFS_UPDATES, Context.MODE_PRIVATE)
+                    .edit().putLong(KEY_LAST_SILENT_CHECK, System.currentTimeMillis()).apply()
+            } catch (_: Exception) {
+                // Prefs failure must never break the update flow.
+            }
+        }
     }
 }

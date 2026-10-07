@@ -24,6 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -75,7 +78,14 @@ class MainActivity : FragmentActivity() {
                     if (locked) {
                         // Opaque cover: nothing of the chats is visible until you unlock.
                         Box(
-                            Modifier.fillMaxSize().background(Color.Black).clickable { showUnlockPrompt() },
+                            Modifier
+                                .fillMaxSize()
+                                .background(Color.Black)
+                                .clickable(
+                                    role = Role.Button,
+                                    onClickLabel = "Unlock Hush",
+                                ) { showUnlockPrompt() }
+                                .semantics { this.contentDescription = "Hush is locked. Double tap to unlock." },
                             contentAlignment = Alignment.Center,
                         ) { Text("Hush is locked. Tap to unlock.", color = Color.White) }
                     }
@@ -166,11 +176,14 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * App-start update check that feeds the system tray. Runs once per process start
-     * (the 6h in-app cool-down lives in ProfileViewModel for the Settings card).
-     * Never interrupts the user: it only posts a notification, never a dialog.
+     * App-start update check that feeds the system tray. Shares the same persisted 6h cool-down as
+     * the Settings card (ProfileViewModel), so a cold start no longer makes an unconditional GitHub
+     * API call or races the in-app check to post/cancel the tray notification. Never interrupts the
+     * user: it only posts a notification, never a dialog.
      */
     private fun checkUpdatesForTray() {
+        if (!com.securemessage.app.ui.profile.ProfileViewModel.shouldSilentCheck(this)) return
+        com.securemessage.app.ui.profile.ProfileViewModel.markSilentChecked(this)
         lifecycleScope.launch {
             GitHubUpdateManager.checkForUpdate(BuildConfig.VERSION_NAME).collect { state ->
                 when (state) {

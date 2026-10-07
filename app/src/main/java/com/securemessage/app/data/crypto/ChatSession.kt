@@ -14,10 +14,14 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 /** An established secure channel with the other person in a chat. */
 class SecureChannel(
-    /** AES-256 key for this chat. */
+    /** v1 AES-256 key for this chat (HKDF, bound to the chat id). Used to encrypt and to decrypt
+     *  messages sent by current app versions. */
     val key: ByteArray,
     /** Same on both phones; people compare it to make sure nobody sits in the middle. */
     val safetyNumber: String,
+    /** Legacy (v0) AES key: bare SHA-256 of the ECDH secret. Only used to decrypt messages sent by
+     *  older app versions, so history isn't lost. Null when there is no legacy derivation. */
+    val legacyKey: ByteArray? = null,
 )
 
 /** Opens the end-to-end encrypted channel for a chat. A seam so chat logic is testable. */
@@ -111,8 +115,9 @@ class ChatSessionManager(
 
         val secret = E2EEncryption.deriveSharedSecret(identity.privateKey(), peer)
         val channel = SecureChannel(
-            key = E2EEncryption.deriveEncryptionKey(secret),
+            key = E2EEncryption.deriveChatKey(secret, chatId),
             safetyNumber = E2EEncryption.computeSafetyNumber(identity.publicKey().encoded, peerBytes),
+            legacyKey = E2EEncryption.deriveEncryptionKey(secret),
         )
         cache[chatId] = Cached(peerBytes, channel)
         return channel

@@ -6,6 +6,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.securemessage.app.data.chatIdFor
@@ -31,26 +32,38 @@ class FirestoreChatRepository(
     private val chats get() = db.collection("chats")
 
     override fun observeChats(uid: String): Flow<List<Chat>> = callbackFlow {
-        val reg = chats.whereArrayContains("participants", uid).addSnapshotListener { snap, e ->
-            if (e != null) {
-                Log.e(TAG, "observeChats failed", e)
-                close(e)
-                return@addSnapshotListener
+        // Bounded: order by most-recent activity and cap the window so reads, memory and battery
+        // don't scale with a user's entire chat history. CHAT_PAGE_LIMIT is well above what fits
+        // on screen, so the list still feels complete; truly ancient chats fall off the live
+        // window rather than streaming forever.
+        val reg = chats.whereArrayContains("participants", uid)
+            .orderBy("lastMessageAt", Query.Direction.DESCENDING)
+            .limit(CHAT_PAGE_LIMIT)
+            .addSnapshotListener { snap, e ->
+                if (e != null) {
+                    Log.e(TAG, "observeChats failed", e)
+                    close(e)
+                    return@addSnapshotListener
+                }
+                trySend(snap?.documents.orEmpty().map { it.toChat() })
             }
-            trySend(snap?.documents.orEmpty().map { it.toChat() })
-        }
         awaitClose { reg.remove() }
     }
 
     override suspend fun openChat(me: User, other: User): Result<String> = runCatching {
         val id = chatIdFor(me.uid, other.uid)
-        // No read first: a get() on a missing chat is denied by the rules.
+        // No read first: a get() on a missing chat is denied by the rules (there is no
+        // resource.data to authorize against). We write with merge, seeding lastMessageAt so a
+        // brand-new chat still has the field observeChats orders by. On an existing chat this
+        // refreshes the activity time to "now", which is acceptable: opening a conversation is a
+        // recent interaction and the client re-sorts by lastMessageAt anyway.
         chats.document(id).set(
             mapOf(
                 "participants" to listOf(me.uid, other.uid).sorted(),
                 "participantNames" to mapOf(me.uid to me.displayName, other.uid to other.displayName),
+                "lastMessageAt" to FieldValue.serverTimestamp(),
             ),
-            SetOptions.mergeFields("participants", "participantNames"),
+            SetOptions.mergeFields("participants", "participantNames", "lastMessageAt"),
         ).await()
         id
     }.onFailure { Log.e(TAG, "openChat failed", it) }
@@ -290,6 +303,9 @@ class FirestoreChatRepository(
 
     private companion object {
         const val TAG = "ChatRepo"
+        /** Most-recent chats kept in the live window. Well above a screenful; older chats fall off
+         *  rather than streaming without bound. */
+        const val CHAT_PAGE_LIMIT = 200L
         /**
          * Safety cap on the stored quote. The quote is encrypted (base64) before it gets here, so
          * this must stay well above the 300-char plaintext limit or it would cut the ciphertext.

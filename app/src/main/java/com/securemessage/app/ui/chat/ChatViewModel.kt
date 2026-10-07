@@ -30,6 +30,9 @@ data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val draft: String = "",
     val error: String? = null,
+    /** True until the first message snapshot (or an error) arrives, so the screen can show a
+     *  loading state instead of flashing the "No messages yet" empty card on every open. */
+    val isLoading: Boolean = true,
     val userMessage: String? = null,
     val isLoadingMore: Boolean = false,
     val hasMoreMessages: Boolean = true,
@@ -184,10 +187,12 @@ class ChatViewModel(
     /** Turns one stored field into what the screen shows. Never shows ciphertext as if it were text. */
     private fun open(value: String, locked: String, unreadable: String): String {
         if (value.isEmpty()) return value
-        val key = channel?.key
+        val ch = channel
+        val key = ch?.key
         if (key == null) return if (E2EEncryption.looksEncrypted(value)) locked else value
         return try {
-            E2EEncryption.decrypt(value, key)
+            // Pass the legacy key too, so messages sent by older app versions still decrypt.
+            E2EEncryption.decrypt(value, key, ch.legacyKey)
         } catch (e: Exception) {
             // Not ciphertext at all means an old plaintext message: show it as it is.
             if (E2EEncryption.looksEncrypted(value)) unreadable else value
@@ -241,9 +246,9 @@ class ChatViewModel(
     private fun observeMessages() {
         viewModelScope.launch {
             chatRepo.observeMessages(chatId)
-                .catch { e -> _state.update { it.copy(error = e.localizedMessage ?: "Couldn't load messages") } }
+                .catch { e -> _state.update { it.copy(error = e.localizedMessage ?: "Couldn't load messages", isLoading = false) } }
                 .collect { window ->
-                    refresh({ MessageWindow.merge(it, window) }) { it.copy(error = null) }
+                    refresh({ MessageWindow.merge(it, window) }) { it.copy(error = null, isLoading = false) }
                     myUid?.let { uid ->
                         // Only mark read when the latest message is from someone else, otherwise
                         // every incoming batch (including our own echo) writes to Firestore and
@@ -356,6 +361,10 @@ class ChatViewModel(
                 _state.update { it.copy(userMessage = "Can't edit yet: secure connection isn't ready") }
                 return@launch
             }
+            if (_state.value.safetyNumberChanged) {
+                _state.update { it.copy(userMessage = "Security code changed — verify it before editing.") }
+                return@launch
+            }
             val body = try {
                 E2EEncryption.encrypt(text, ch.key)
             } catch (e: Exception) {
@@ -403,6 +412,13 @@ class ChatViewModel(
             if (ch == null) {
                 // Never fall back to plaintext: this is an end-to-end encrypted chat.
                 restore("Can't send yet: ${_state.value.title} hasn't set up secure messaging. Ask them to open Hush, then try again.")
+                return@launch
+            }
+            // Hard gate: if the peer's safety number changed and the user hasn't acknowledged it,
+            // refuse to send to the unverified key. This blocks a silent key-substitution MITM —
+            // the user must confirm the change (ideally compare codes) before any message leaves.
+            if (_state.value.safetyNumberChanged) {
+                restore("Verify ${_state.value.title}'s security code changed before sending. Open the chat menu to review it.")
                 return@launch
             }
 
@@ -482,7 +498,7 @@ class ChatViewModel(
 
     /** At most one read-receipt write per 5s; Firestore listeners make tighter loops wasteful. */
     private fun markChatReadThrottled(userId: String) {
-        val now = System.currentTimeMillis()
+        val now = clock()
         if (now - lastMarkReadMs < MARK_READ_THROTTLE_MS) return
         lastMarkReadMs = now
         markChatRead(userId)
