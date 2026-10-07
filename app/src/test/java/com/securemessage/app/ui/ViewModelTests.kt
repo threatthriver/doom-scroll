@@ -8,6 +8,7 @@ import com.securemessage.app.data.model.User
 import com.securemessage.app.data.repo.UsernameTakenException
 import com.securemessage.app.fakes.FakeAuthRepository
 import com.securemessage.app.fakes.FakeChatRepository
+import com.securemessage.app.fakes.FakePushTokenRepository
 import com.securemessage.app.fakes.FakeUserRepository
 import com.securemessage.app.ui.auth.AuthViewModel
 import com.securemessage.app.ui.auth.MSG_PROFILE_FAILED
@@ -15,6 +16,8 @@ import com.securemessage.app.ui.auth.MSG_USERNAME_TAKEN
 import com.securemessage.app.ui.auth.REASON_PROFILE_FAILED
 import com.securemessage.app.ui.auth.REASON_USERNAME_TAKEN
 import com.securemessage.app.ui.chat.ChatViewModel
+import com.securemessage.app.ui.chat.TEXT_ENCRYPTED_PENDING
+import com.securemessage.app.ui.chat.TEXT_UNREADABLE
 import com.securemessage.app.ui.conversations.ConversationsViewModel
 import com.securemessage.app.ui.profile.ProfileViewModel
 import com.securemessage.app.ui.users.UserSearchViewModel
@@ -26,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -39,7 +43,7 @@ class AuthViewModelTest {
     private val users = FakeUserRepository()
 
     private fun vm(reason: String? = null) =
-        AuthViewModel(SavedStateHandle(mapOf("reason" to reason)), auth, users) { it.contains("@") && it.contains(".") }
+        AuthViewModel(SavedStateHandle(mapOf("reason" to reason)), auth, users, FakePushTokenRepository()) { it.contains("@") && it.contains(".") }
 
     private fun AuthViewModel.fillSignUp(
         email: String = "a@b.co", pw: String = "secret1", name: String = "Alice", user: String = "alice_1",
@@ -123,14 +127,14 @@ class ConversationsViewModelTest {
 
     @Test fun missingProfileSetsNeedsProfile() = runTest {
         users.getUserResult = Result.failure(NoSuchElementException())
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         assertTrue(v.state.value.needsProfile)
     }
 
     @Test fun otherFailureIgnored() = runTest {
         users.getUserResult = Result.failure(IOException())
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         assertFalse(v.state.value.needsProfile)
         assertFalse(v.state.value.isLoading)
@@ -141,7 +145,7 @@ class ConversationsViewModelTest {
             Chat("active", listOf("me", "bob"), archived = mapOf("me" to false)),
             Chat("hidden", listOf("me", "cat"), archived = mapOf("me" to true)),
         )
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         assertEquals(listOf("hidden"), v.state.value.archivedChats.map { it.id })
         assertEquals(1, v.state.value.archivedCount)
@@ -151,7 +155,7 @@ class ConversationsViewModelTest {
 
     @Test fun archiveCountIsZeroWhenNothingArchived() = runTest {
         chats.chats.value = listOf(Chat("a", listOf("me", "bob")))
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         assertEquals(0, v.state.value.archivedCount)
         assertTrue(v.state.value.archivedChats.isEmpty())
@@ -159,7 +163,7 @@ class ConversationsViewModelTest {
 
     @Test fun archivedFlagIsPerUser() = runTest {
         chats.chats.value = listOf(Chat("c", listOf("me", "bob"), archived = mapOf("bob" to true)))
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         // Archived by the *other* participant only — must not vanish from my list
         assertFalse(v.isArchived(v.state.value.chats.first()))
@@ -167,7 +171,7 @@ class ConversationsViewModelTest {
     }
 
     @Test fun toggleArchiveDelegatesToRepository() = runTest {
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         val chat = Chat("c1", listOf("me", "bob"))
         v.toggleArchive(chat)
         advanceUntilIdle()
@@ -176,14 +180,14 @@ class ConversationsViewModelTest {
 
     @Test fun toggleArchiveSurfacesFailure() = runTest {
         chats.toggleArchiveResult = Result.failure(IOException())
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         v.toggleArchive(Chat("c1"))
         advanceUntilIdle()
         assertNotNull(v.state.value.error)
     }
 
     @Test fun toggleArchiveIsIgnoredWithoutASignedInUser() = runTest {
-        val v = ConversationsViewModel(FakeAuthRepository(currentUserId = null), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(currentUserId = null), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         v.toggleArchive(Chat("c1"))
         advanceUntilIdle()
@@ -208,32 +212,32 @@ class ConversationsViewModelTest {
     }
 
     @Test fun titleUsesOtherParticipant() {
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         assertEquals("Bob", v.titleFor(Chat("c", listOf("bob", "me"), mapOf("me" to "Me", "bob" to "Bob"))))
         assertEquals("Unknown", v.titleFor(Chat("c", listOf("bob", "me"))))
     }
 
     @Test fun unreadCountForCurrentUser() {
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         val chat = Chat("c", listOf("me", "bob"), unreadCount = mapOf("me" to 5, "bob" to 3))
         assertEquals(5, v.unreadCountFor(chat))
     }
 
     @Test fun unreadCountDefaultsToZero() {
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         val chat = Chat("c", listOf("me", "bob"))
         assertEquals(0, v.unreadCountFor(chat))
     }
 
     @Test fun myDisplayNameComesFromFirestoreProfile() = runTest {
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         assertEquals("Me", v.state.value.myDisplayName)
     }
 
     @Test fun missingProfileLeavesDisplayNameEmpty() = runTest {
         users.getUserResult = Result.failure(NoSuchElementException())
-        val v = ConversationsViewModel(FakeAuthRepository(), chats, users)
+        val v = ConversationsViewModel(FakeAuthRepository(), chats, users, FakePushTokenRepository())
         advanceUntilIdle()
         assertTrue(v.state.value.myDisplayName.isEmpty())
         assertTrue(v.state.value.needsProfile)
@@ -340,7 +344,20 @@ class ProfileEditValidationTest {
 class ChatViewModelTest {
     @get:Rule val main = MainDispatcherRule()
     private val chats = FakeChatRepository()
-    private fun vm() = ChatViewModel(SavedStateHandle(mapOf("chatId" to "c1")), chats, FakeAuthRepository(), null, null)
+    private val key = ByteArray(32) { (it * 5 + 1).toByte() }
+    private val crypto = com.securemessage.app.fakes.FakeChatCrypto(com.securemessage.app.data.crypto.SecureChannel(key, "AAAA"))
+    private val safety = com.securemessage.app.fakes.FakeSafetyNumbers()
+    private var now = 1_000_000L
+
+    init {
+        chats.getChatResult = Result.success(Chat("c1", listOf("bob", "me"), mapOf("bob" to "Bob", "me" to "Me")))
+    }
+
+    private fun vm() = ChatViewModel(
+        SavedStateHandle(mapOf("chatId" to "c1")), chats, FakeAuthRepository(), crypto, safety,
+        clock = { now }, workDispatcher = main.dispatcher,
+    )
+    private fun plain(cipher: String) = com.securemessage.app.data.crypto.E2EEncryption.decrypt(cipher, key)
 
     @Test fun titleFromOtherParticipant() = runTest {
         chats.getChatResult = Result.success(Chat("c1", listOf("bob", "me"), mapOf("bob" to "Bob", "me" to "Me")))
@@ -349,6 +366,7 @@ class ChatViewModelTest {
     }
 
     @Test fun titleFallback() = runTest {
+        chats.getChatResult = Result.failure(NoSuchElementException())
         val v = vm(); advanceUntilIdle()
         assertEquals("Chat", v.state.value.title)
     }
@@ -363,8 +381,15 @@ class ChatViewModelTest {
     @Test fun sendTrimsAndClears() = runTest {
         val v = vm()
         v.onDraftChange(" hi "); v.send(); advanceUntilIdle()
-        assertEquals(listOf("hi"), chats.sent)
+        assertEquals(listOf("hi"), chats.sent.map(::plain))
         assertEquals("", v.state.value.draft)
+    }
+
+    @Test fun sentTextIsNeverPlaintext() = runTest {
+        val v = vm()
+        v.onDraftChange("my secret"); v.send(); advanceUntilIdle()
+        assertTrue(chats.sent.single() != "my secret")
+        assertTrue(!chats.sent.single().contains("secret"))
     }
 
     @Test fun plainSendCarriesNoReply() = runTest {
@@ -373,12 +398,114 @@ class ChatViewModelTest {
         assertEquals(listOf(Triple("", "", "")), chats.sentReplies)
     }
 
-    @Test fun replySendQuotesOriginal() = runTest {
+    @Test fun replySendQuotesOriginalEncrypted() = runTest {
         val v = vm()
         v.onDraftChange("answer"); v.send(com.securemessage.app.data.model.Message("m1", "question", "bob"))
         advanceUntilIdle()
-        assertEquals(listOf("answer"), chats.sent)
-        assertEquals(listOf(Triple("m1", "question", "bob")), chats.sentReplies)
+        assertEquals(listOf("answer"), chats.sent.map(::plain))
+        val (id, quote, sender) = chats.sentReplies.single()
+        assertEquals("m1", id)
+        assertEquals("bob", sender)
+        assertTrue("the quote must not be stored as plaintext", quote != "question")
+        assertEquals("question", plain(quote))
+    }
+
+    @Test fun sendPassesRecipientsSoTheRepositoryNeedsNoServerRead() = runTest {
+        val v = vm()
+        v.onDraftChange("hi"); v.send(); advanceUntilIdle()
+        assertEquals(listOf(listOf("bob")), chats.sentRecipients)
+    }
+
+    @Test fun aSendIsNeverHeldUpByAKeyLookupWhenAChannelExists() = runTest {
+        val v = vm(); advanceUntilIdle()
+        val lookupsBefore = crypto.lookups
+        now += 10 * 60 * 1000L // long past the re-check interval
+        var sentWhenLookupRan = -1
+        crypto.onLookup = { sentWhenLookupRan = chats.sent.size }
+        v.onDraftChange("hi"); v.send(); advanceUntilIdle()
+        assertEquals(listOf("hi"), chats.sent.map(::plain))
+        assertEquals("the key is still re-checked", lookupsBefore + 1, crypto.lookups)
+        assertEquals("but only after the message was already sent", 1, sentWhenLookupRan)
+    }
+
+    @Test fun messagesAreReadableFromTheCachedKeyBeforeTheServerAnswers() = runTest {
+        crypto.channel = null
+        crypto.cached = com.securemessage.app.data.crypto.SecureChannel(key, "AAAA")
+        val cipher = com.securemessage.app.data.crypto.E2EEncryption.encrypt("instant", key)
+        chats.messages.value = listOf(com.securemessage.app.data.model.Message("m1", cipher, "bob"))
+        val v = vm(); advanceUntilIdle()
+        assertEquals("instant", v.state.value.messages.single().text)
+    }
+
+    @Test fun unchangedMessagesAreNotDecryptedAgain() = runTest {
+        val cipher = com.securemessage.app.data.crypto.E2EEncryption.encrypt("hello", key)
+        val m1 = com.securemessage.app.data.model.Message("m1", cipher, "bob")
+        chats.messages.value = listOf(m1)
+        val v = vm(); advanceUntilIdle()
+        val first = v.state.value.messages.single()
+        chats.messages.value = listOf(m1, com.securemessage.app.data.model.Message("m2", cipher, "bob"))
+        advanceUntilIdle()
+        assertSame("the same object, so the list can skip redrawing it", first, v.state.value.messages.first())
+    }
+
+    @Test fun refusesToSendPlaintextWhenNoKeyIsAvailable() = runTest {
+        crypto.channel = null
+        val v = vm()
+        v.onDraftChange("hello"); v.send(); advanceUntilIdle()
+        assertTrue("nothing may be sent unencrypted", chats.sent.isEmpty())
+        assertEquals("hello", v.state.value.draft)
+        assertNotNull(v.state.value.userMessage)
+        assertTrue(!v.state.value.isEncrypted)
+    }
+
+    @Test fun sendsOnceTheOtherPersonPublishesTheirKey() = runTest {
+        crypto.channel = null
+        val v = vm(); advanceUntilIdle()
+        v.onDraftChange("hello"); v.send(); advanceUntilIdle()
+        assertTrue(chats.sent.isEmpty())
+        crypto.channel = com.securemessage.app.data.crypto.SecureChannel(key, "AAAA")
+        v.send(); advanceUntilIdle()
+        assertEquals(listOf("hello"), chats.sent.map(::plain))
+    }
+
+    @Test fun ciphertextIsNeverShownAsText() = runTest {
+        val cipher = com.securemessage.app.data.crypto.E2EEncryption.encrypt("hi there", key)
+        val other = com.securemessage.app.data.crypto.E2EEncryption.encrypt("hi there", ByteArray(32) { 9 })
+        chats.messages.value = listOf(
+            com.securemessage.app.data.model.Message("m1", cipher, "bob"),
+            com.securemessage.app.data.model.Message("m2", other, "bob"),
+            com.securemessage.app.data.model.Message("m3", "old plain message", "bob"),
+        )
+        val v = vm(); advanceUntilIdle()
+        val texts = v.state.value.messages.map { it.text }
+        assertEquals(listOf("hi there", TEXT_UNREADABLE, "old plain message"), texts)
+    }
+
+    @Test fun messagesShowAsEncryptedUntilTheKeyArrives() = runTest {
+        crypto.channel = null
+        val cipher = com.securemessage.app.data.crypto.E2EEncryption.encrypt("hi there", key)
+        chats.messages.value = listOf(com.securemessage.app.data.model.Message("m1", cipher, "bob"))
+        val v = vm(); advanceUntilIdle()
+        assertEquals(TEXT_ENCRYPTED_PENDING, v.state.value.messages.single().text)
+        crypto.channel = com.securemessage.app.data.crypto.SecureChannel(key, "AAAA")
+        v.onDraftChange("ping"); v.send(); advanceUntilIdle() // triggers a fresh key lookup
+        assertEquals("hi there", v.state.value.messages.single().text)
+    }
+
+    @Test fun firstSafetyNumberIsTrustedThenChangeIsFlagged() = runTest {
+        val v = vm(); advanceUntilIdle()
+        assertEquals("AAAA", safety.saved["c1"])
+        assertTrue(!v.state.value.safetyNumberChanged)
+
+        crypto.channel = com.securemessage.app.data.crypto.SecureChannel(key, "BBBB")
+        now += 3 * 60 * 1000L
+        v.onDraftChange("hi"); v.send(); advanceUntilIdle() // re-verifies after 2 minutes
+        assertTrue(v.state.value.safetyNumberChanged)
+        assertEquals("the trusted number must not change by itself", "AAAA", safety.saved["c1"])
+
+        v.acknowledgeSafetyNumber()
+        assertTrue(!v.state.value.safetyNumberChanged)
+        assertEquals("BBBB", safety.saved["c1"])
     }
 
     @Test fun failureRestoresDraft() = runTest {

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Blue -> violet diagonal gradient, matching the outgoing message bubbles -->
+<!-- Hush: a clean white canvas with the faintest lavender tint toward the bottom, so the glowing
+     orb in the foreground is the only thing with colour. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -10,13 +11,12 @@
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="0"
+                android:startX="54"
                 android:startY="0"
-                android:endX="108"
+                android:endX="54"
                 android:endY="108">
-                <item android:offset="0.0" android:color="#FF2AABEE" />
-                <item android:offset="0.55" android:color="#FF3F7FE8" />
-                <item android:offset="1.0" android:color="#FF6A5AE0" />
+                <item android:offset="0.0" android:color="#FFFFFFFF" />
+                <item android:offset="1.0" android:color="#FFF1EEFF" />
             </gradient>
         </aapt:attr>
     </path>

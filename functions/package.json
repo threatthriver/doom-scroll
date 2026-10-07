@@ -1,0 +1,32 @@
+{
+  "name": "secure-message-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest",
+    "test:rules": "jest --config jest.rules.config.js --runInBand"
+  },
+  "dependencies": {
+    "firebase-admin": "12.7.0",
+    "firebase-functions": "6.1.1"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "4.0.1",
+    "@types/jest": "29.5.14",
+    "firebase": "11.10.0",
+    "jest": "29.7.0",
+    "ts-jest": "29.2.5",
+    "typescript": "5.6.3"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/test"
+    ]
+  }
+}

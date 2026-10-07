@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import com.securemessage.app.SecureMessageApp
 import com.securemessage.app.di.AppContainer
 import com.securemessage.app.ui.auth.AuthViewModel
+import com.securemessage.app.ui.auth.VerifyEmailViewModel
 import com.securemessage.app.ui.chat.ChatViewModel
 import com.securemessage.app.ui.conversations.ConversationsViewModel
 import com.securemessage.app.ui.users.UserSearchViewModel
@@ -20,11 +21,15 @@ object AppViewModelFactory {
     val Factory: ViewModelProvider.Factory = viewModelFactory {
         initializer {
             val c = container()
-            AuthViewModel(createSavedStateHandle(), c.authRepository, c.userRepository)
+            AuthViewModel(createSavedStateHandle(), c.authRepository, c.userRepository, c.pushTokenRepository)
         }
         initializer {
             val c = container()
-            ConversationsViewModel(c.authRepository, c.chatRepository, c.userRepository)
+            VerifyEmailViewModel(createSavedStateHandle(), c.authRepository, c.userRepository, c.pushTokenRepository)
+        }
+        initializer {
+            val c = container()
+            ConversationsViewModel(c.authRepository, c.chatRepository, c.userRepository, c.pushTokenRepository)
         }
         initializer {
             val c = container()
@@ -32,13 +37,12 @@ object AppViewModelFactory {
         }
         initializer {
             val c = container()
-            val app = this[APPLICATION_KEY] as SecureMessageApp
             ChatViewModel(
                 createSavedStateHandle(),
                 c.chatRepository,
                 c.authRepository,
                 c.chatSessionManager,
-                app.applicationContext,
+                c.safetyNumbers,
             )
         }
         initializer {

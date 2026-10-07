@@ -12,4 +12,6 @@ data class Message(
     val replyToId: String = "",
     val replyToText: String = "",
     val replyToSender: String = "",
+    /** True once the sender has changed the text after sending. */
+    val edited: Boolean = false,
 )

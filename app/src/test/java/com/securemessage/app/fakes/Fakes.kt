@@ -6,6 +6,7 @@ import com.securemessage.app.data.model.Message
 import com.securemessage.app.data.model.User
 import com.securemessage.app.data.repo.AuthRepository
 import com.securemessage.app.data.repo.ChatRepository
+import com.securemessage.app.data.repo.PushTokenRepository
 import com.securemessage.app.data.repo.UserRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +19,15 @@ class FakeAuthRepository(
     var signInResult: Result<String> = Result.success("me")
     var calls = 0
     var signedOut = false
+    var verified = true
+    var googleResult: Result<String> = Result.success("me")
+    var verificationSent = 0
+    var reloadResult: Result<Boolean> = Result.success(true)
 
+    override val isEmailVerified: Boolean get() = verified
+    override suspend fun signInWithGoogleIdToken(idToken: String): Result<String> { calls++; return googleResult }
+    override suspend fun sendEmailVerification(): Result<Unit> { verificationSent++; return Result.success(Unit) }
+    override suspend fun reloadUser(): Result<Boolean> = reloadResult.also { r -> r.getOrNull()?.let { verified = it } }
     override suspend fun signUp(email: String, password: String): Result<String> { calls++; return signUpResult }
     override suspend fun signIn(email: String, password: String): Result<String> { calls++; return signInResult }
     override fun signOut() { signedOut = true }
@@ -58,6 +67,7 @@ class FakeChatRepository : ChatRepository {
     var toggleArchiveResult: Result<Unit> = Result.success(Unit)
     var loadMoreResult: Result<List<Message>> = Result.success(emptyList())
     val sent = mutableListOf<String>()
+    val sentRecipients = mutableListOf<List<String>?>()
     val sentReplies = mutableListOf<Triple<String, String, String>>()
     val deleted = mutableListOf<String>()
     val reactions = mutableListOf<Triple<String, String, String>>()
@@ -76,8 +86,10 @@ class FakeChatRepository : ChatRepository {
         text: String,
         replyToId: String,
         replyToText: String,
-        replyToSender: String
+        replyToSender: String,
+        recipientIds: List<String>?
     ): Result<Unit> {
+        sentRecipients += recipientIds
         sent += text
         sentReplies += Triple(replyToId, replyToText, replyToSender)
         return sendResult
@@ -112,5 +124,36 @@ class FakeChatRepository : ChatRepository {
     }
     override suspend fun loadMoreMessages(chatId: String, beforeTimestamp: Timestamp, limit: Int): Result<List<Message>> {
         return loadMoreResult
+    }
+}
+
+class FakePushTokenRepository : PushTokenRepository {
+    var registered = 0
+    var unregistered = 0
+    override suspend fun registerCurrentToken(): Result<Unit> { registered++; return Result.success(Unit) }
+    override suspend fun register(token: String): Result<Unit> { registered++; return Result.success(Unit) }
+    override suspend fun unregister(): Result<Unit> { unregistered++; return Result.success(Unit) }
+}
+
+/** Hands out a fixed channel (or none), and records lookups. Swap [channel] to simulate a key change. */
+class FakeChatCrypto(var channel: com.securemessage.app.data.crypto.SecureChannel?) :
+    com.securemessage.app.data.crypto.ChatCrypto {
+    /** What the local-cache-only lookup returns. */
+    var cached: com.securemessage.app.data.crypto.SecureChannel? = null
+    var lookups = 0
+    override suspend fun openCachedChannel(chatId: String, otherUid: String) = cached
+    var onLookup: (() -> Unit)? = null
+    override suspend fun openChannel(chatId: String, otherUid: String): com.securemessage.app.data.crypto.SecureChannel? {
+        lookups++
+        onLookup?.invoke()
+        return channel
+    }
+}
+
+class FakeSafetyNumbers : com.securemessage.app.data.crypto.SafetyNumberStore {
+    val saved = mutableMapOf<String, String>()
+    override fun get(chatId: String): String? = saved[chatId]
+    override fun set(chatId: String, number: String) {
+        saved[chatId] = number
     }
 }

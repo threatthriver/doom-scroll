@@ -14,10 +14,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.securemessage.app.data.AuthDestination
+import com.securemessage.app.data.AuthGate
 import com.securemessage.app.di.AppContainer
 import com.securemessage.app.ui.auth.CompleteProfileScreen
 import com.securemessage.app.ui.auth.SignInScreen
 import com.securemessage.app.ui.auth.SignUpScreen
+import com.securemessage.app.ui.auth.VerifyEmailScreen
 import com.securemessage.app.ui.chat.ChatScreen
 import com.securemessage.app.ui.conversations.ConversationsScreen
 import com.securemessage.app.ui.main.MainScreen
@@ -26,6 +29,13 @@ import com.securemessage.app.ui.users.UserSearchScreen
 /** Navigate and clear the entire back stack. */
 private fun NavHostController.navigateClearing(route: String) =
     navigate(route) { popUpTo(graph.id) { inclusive = true } }
+
+private fun AuthDestination.route(): String = when (this) {
+    AuthDestination.SIGN_IN -> Routes.SIGN_IN
+    AuthDestination.VERIFY_EMAIL -> Routes.verifyEmail()
+    AuthDestination.COMPLETE_PROFILE -> Routes.completeProfile()
+    AuthDestination.CONVERSATIONS -> Routes.CONVERSATIONS
+}
 
 @Composable
 fun AppNavHost(
@@ -36,7 +46,9 @@ fun AppNavHost(
 ) {
     val nav = rememberNavController()
     val start = remember {
-        if (container.firebaseAuth.currentUser != null) Routes.CONVERSATIONS else Routes.SIGN_IN
+        val user = container.firebaseAuth.currentUser
+        // The profile isn't known yet at launch; Conversations redirects to Complete Profile if it's missing.
+        AuthGate.route(user != null, user?.isEmailVerified == true, hasProfile = true).route()
     }
 
     // Deep-link from the tray: jump straight into the chat once the graph is ready.
@@ -51,6 +63,7 @@ fun AppNavHost(
             SignInScreen(
                 onAuthenticated = { nav.navigateClearing(Routes.CONVERSATIONS) },
                 onNeedsProfile = { nav.navigateClearing(Routes.completeProfile()) },
+                onNeedsVerification = { nav.navigateClearing(Routes.verifyEmail()) },
                 onCreateAccount = { nav.navigate(Routes.SIGN_UP) },
             )
         }
@@ -58,7 +71,22 @@ fun AppNavHost(
             SignUpScreen(
                 onAuthenticated = { nav.navigateClearing(Routes.CONVERSATIONS) },
                 onNeedsProfile = { reason -> nav.navigateClearing(Routes.completeProfile(reason)) },
+                onNeedsVerification = { nav.navigateClearing(Routes.verifyEmail(sent = true)) },
                 onBack = { nav.popBackStack() },
+            )
+        }
+        composable(
+            Routes.VERIFY_EMAIL,
+            arguments = listOf(
+                navArgument("sent") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) {
+            VerifyEmailScreen(
+                onVerified = { dest -> nav.navigateClearing(dest.route()) },
+                onSignedOut = { nav.navigateClearing(Routes.SIGN_IN) },
             )
         }
         composable(
@@ -73,6 +101,7 @@ fun AppNavHost(
         ) {
             CompleteProfileScreen(
                 onAuthenticated = { nav.navigateClearing(Routes.CONVERSATIONS) },
+                onNeedsVerification = { nav.navigateClearing(Routes.verifyEmail()) },
                 onSignedOut = { nav.navigateClearing(Routes.SIGN_IN) },
             )
         }
@@ -80,6 +109,7 @@ fun AppNavHost(
             MainScreen(
                 onOpenChat = { id -> nav.navigate(Routes.chat(id)) },
                 onNeedsProfile = { nav.navigateClearing(Routes.completeProfile()) },
+                onNeedsVerification = { nav.navigateClearing(Routes.verifyEmail()) },
                 onSignedOut = { nav.navigateClearing(Routes.SIGN_IN) },
                 openUpdates = openUpdates,
                 onEditProfile = { displayName, bio ->

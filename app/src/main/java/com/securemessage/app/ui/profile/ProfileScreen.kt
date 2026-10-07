@@ -3,9 +3,7 @@ package com.securemessage.app.ui.profile
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,21 +15,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -39,9 +38,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,8 +49,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,15 +62,14 @@ import com.securemessage.app.data.crypto.KeyStoreManager
 import com.securemessage.app.ui.common.AppViewModelFactory
 import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.theme.HairlineBorder
-import com.securemessage.app.ui.theme.HairlineBorderSubtle
 import com.securemessage.app.ui.theme.ObsidianCard
-import com.securemessage.app.ui.theme.ObsidianSurfaceElevated
 import com.securemessage.app.ui.theme.ObsidianVoid
-import com.securemessage.app.ui.theme.PureBlack
-import com.securemessage.app.ui.theme.PureWhite
 import com.securemessage.app.ui.theme.TextMuted
 import com.securemessage.app.ui.theme.TextPrimary
 import com.securemessage.app.ui.theme.TextSecondary
+import com.securemessage.app.ui.theme.TgBlue
+import com.securemessage.app.ui.theme.TgErrorRed
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -86,10 +86,10 @@ fun ProfileScreen(
     var showEditDialog by remember { mutableStateOf(false) }
     var editDisplayName by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
-    var selectedProfileTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.userNotification) {
         state.userNotification?.let {
@@ -99,7 +99,7 @@ fun ProfileScreen(
     }
 
     val effectiveName = state.displayName.ifEmpty { displayName.ifEmpty { "User" } }
-    val effectiveEmail = state.email.ifEmpty { email.ifEmpty { "no email" } }
+    val effectiveEmail = state.email.ifEmpty { email }
     val effectiveUid = state.uid.ifEmpty { uid }
     val effectiveBio = state.bio
 
@@ -119,6 +119,12 @@ fun ProfileScreen(
         }.getOrElse { "Unavailable" }
     }
 
+    fun openEdit() {
+        editDisplayName = effectiveName
+        editBio = effectiveBio
+        showEditDialog = true
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -128,332 +134,104 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // Profile Avatar with Camera action
-            Box(contentAlignment = Alignment.BottomEnd) {
-                MonochromeAvatar(
-                    initials = initials,
-                    size = 96.dp,
-                )
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(PureWhite)
-                        .border(2.dp, ObsidianVoid, CircleShape)
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            Toast.makeText(context, "Photo upload coming soon", Toast.LENGTH_SHORT).show()
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CameraAlt,
-                        contentDescription = "Set Photo",
-                        tint = PureBlack,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
+            MonochromeAvatar(initials = initials, size = 96.dp)
 
             Spacer(Modifier.height(14.dp))
 
-            // User Display Name & Status
             Text(
                 text = effectiveName,
                 fontSize = 24.sp,
-                fontWeight = FontWeight.Black,
-                color = PureWhite,
-                letterSpacing = (-0.5).sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary,
+                letterSpacing = (-0.3).sp,
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(top = 4.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .clip(CircleShape)
-                        .background(PureWhite),
-                )
+            if (state.username.isNotEmpty()) {
                 Text(
-                    text = "signed in",
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = TextMuted,
+                    text = "@${state.username}",
+                    fontSize = 14.sp,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(top = 2.dp),
                 )
-            }
-
-            Spacer(Modifier.height(18.dp))
-
-            // Action Buttons: Set Photo | Edit Info | Settings
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                TelegramActionPill(
-                    icon = Icons.Filled.CameraAlt,
-                    label = "Set Photo",
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "Photo upload coming soon", Toast.LENGTH_SHORT).show()
-                    },
-                )
-                TelegramActionPill(
-                    icon = Icons.Filled.Edit,
-                    label = "Edit Info",
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        editDisplayName = effectiveName
-                        editBio = effectiveBio
-                        showEditDialog = true
-                    },
-                )
-                TelegramActionPill(
-                    icon = Icons.Filled.Settings,
-                    label = "Settings",
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    },
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // Info Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(ObsidianCard)
-                    .border(1.dp, HairlineBorder, RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    // Email
-                    Column {
-                        Text(
-                            text = effectiveEmail,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = PureWhite,
-                        )
-                        Text(
-                            text = "User ID",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = TextMuted,
-                        )
-                    }
-
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
-
-                    // Username
-                    if (state.username.isNotEmpty()) {
-                        Column {
-                            Text(
-                                text = "@${state.username}",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = PureWhite,
-                            )
-                            Text(
-                                text = "Username",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = TextMuted,
-                            )
-                        }
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
-                    }
-
-                    // Bio
-                    if (effectiveBio.isNotEmpty()) {
-                        Column {
-                            Text(
-                                text = effectiveBio,
-                                fontSize = 13.sp,
-                                color = TextSecondary,
-                            )
-                            Text(
-                                text = "Bio",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = TextMuted,
-                            )
-                        }
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
-                    }
-
-                    // Fingerprint
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column {
-                            Text(
-                                text = keyFingerprint,
-                                fontSize = 13.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = PureWhite,
-                            )
-                            Text(
-                                text = "Security code (tap to copy)",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = TextMuted,
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Filled.ContentCopy,
-                            contentDescription = "Copy Fingerprint",
-                            tint = PureWhite,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clickable {
-                                    val clip = ClipData.newPlainText("Key Fingerprint", keyFingerprint)
-                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    cm.setPrimaryClip(clip)
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    Toast.makeText(context, "Key copied to clipboard", Toast.LENGTH_SHORT).show()
-                                },
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // Segmented Control
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(ObsidianCard)
-                    .border(1.dp, HairlineBorder, RoundedCornerShape(24.dp))
-                    .padding(4.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (selectedProfileTab == 0) PureWhite else ObsidianCard)
-                        .clickable { selectedProfileTab = 0 }
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = "Chats",
-                        color = if (selectedProfileTab == 0) PureBlack else TextMuted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (selectedProfileTab == 1) PureWhite else ObsidianCard)
-                        .clickable { selectedProfileTab = 1 }
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                ) {
-                    Text(
-                        text = "Archived chats",
-                        color = if (selectedProfileTab == 1) PureBlack else TextMuted,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                }
             }
 
             Spacer(Modifier.height(24.dp))
 
-            // Empty State
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(vertical = 12.dp),
-            ) {
-                Text(
-                    text = if (selectedProfileTab == 0) "Nothing here yet" else "Nothing archived yet",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PureWhite,
-                )
-                Text(
-                    text = "Archived chats and media will appear here.",
-                    fontSize = 12.sp,
-                    color = TextMuted,
-                )
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PureWhite,
-                        contentColor = PureBlack,
-                    ),
-                    shape = RoundedCornerShape(24.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CameraAlt,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "New Chat",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                    )
+            // Details
+            ProfileCard {
+                if (effectiveEmail.isNotEmpty()) {
+                    InfoRow(icon = Icons.Filled.Email, value = effectiveEmail, label = "Email")
                 }
+                if (state.username.isNotEmpty()) {
+                    InfoRow(icon = Icons.Filled.Person, value = "@${state.username}", label = "Username")
+                }
+                InfoRow(
+                    icon = Icons.Filled.Info,
+                    value = effectiveBio.ifEmpty { "Add a few words about yourself" },
+                    label = "Bio",
+                    valueColor = if (effectiveBio.isEmpty()) TextMuted else TextPrimary,
+                    onClick = ::openEdit,
+                    onClickLabel = "Edit bio",
+                )
             }
 
-            Spacer(Modifier.height(30.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Sign out button
-            Button(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showSignOutConfirm = true
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, HairlineBorder),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ObsidianCard,
-                    contentColor = PureWhite,
-                ),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Logout,
-                        contentDescription = "Sign Out",
-                        tint = PureWhite,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text(
-                        text = "Sign out",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.8.sp,
-                    )
-                }
+            // Security code: whole row copies
+            ProfileCard {
+                InfoRow(
+                    icon = Icons.Filled.Lock,
+                    value = keyFingerprint,
+                    label = "Your key fingerprint. Tap to copy. Each chat has its own shared security code.",
+                    monospaceValue = true,
+                    trailing = {
+                        Icon(
+                            imageVector = Icons.Filled.ContentCopy,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                    onClick = {
+                        val clip = ClipData.newPlainText("Key fingerprint", keyFingerprint)
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(clip)
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        scope.launch {
+                            snackbar.currentSnackbarData?.dismiss()
+                            snackbar.showSnackbar("Key fingerprint copied")
+                        }
+                    },
+                    onClickLabel = "Copy key fingerprint",
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            ProfileCard {
+                InfoRow(
+                    icon = Icons.Filled.Edit,
+                    value = "Edit profile",
+                    label = null,
+                    iconTint = TgBlue,
+                    valueColor = TgBlue,
+                    onClick = ::openEdit,
+                )
+                InfoRow(
+                    icon = Icons.AutoMirrored.Filled.Logout,
+                    value = "Sign out",
+                    label = null,
+                    iconTint = TgErrorRed,
+                    valueColor = TgErrorRed,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showSignOutConfirm = true
+                    },
+                )
             }
 
             Spacer(Modifier.height(130.dp))
@@ -467,94 +245,58 @@ fun ProfileScreen(
         )
     }
 
-    // Edit Profile Dialog
     if (showEditDialog) {
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
             containerColor = ObsidianCard,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             title = {
                 Text(
                     text = "Edit profile",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = PureWhite,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    color = TextPrimary,
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    androidx.compose.material3.OutlinedTextField(
+                    OutlinedTextField(
                         value = editDisplayName,
                         onValueChange = { editDisplayName = it },
-                        label = { Text("Display Name", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                        label = { Text("Name") },
                         singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PureWhite,
-                            unfocusedBorderColor = HairlineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedLabelColor = PureWhite,
-                            unfocusedLabelColor = TextMuted,
-                            cursorColor = PureWhite,
-                            focusedContainerColor = ObsidianCard,
-                            unfocusedContainerColor = ObsidianCard,
-                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = profileFieldColors(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    androidx.compose.material3.OutlinedTextField(
+                    OutlinedTextField(
                         value = editBio,
                         onValueChange = { editBio = it },
-                        label = { Text("Bio", fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                        label = { Text("Bio") },
                         maxLines = 3,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = PureWhite,
-                            unfocusedBorderColor = HairlineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedLabelColor = PureWhite,
-                            unfocusedLabelColor = TextMuted,
-                            cursorColor = PureWhite,
-                            focusedContainerColor = ObsidianCard,
-                            unfocusedContainerColor = ObsidianCard,
-                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = profileFieldColors(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             },
             confirmButton = {
-                Button(
+                TextButton(
+                    enabled = editDisplayName.isNotBlank(),
                     onClick = {
                         showEditDialog = false
-                        // Saved for real through the shared ProfileViewModel (which
-                        // reports success/failure). Previously this only toasted.
+                        // Saved for real through the shared ProfileViewModel, which
+                        // reports success or failure through the snackbar.
                         vm.updateProfile(editDisplayName, editBio)
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PureWhite,
-                        contentColor = PureBlack,
-                    ),
-                    shape = RoundedCornerShape(8.dp),
                 ) {
-                    Text(
-                        text = "Save",
-                        color = PureBlack,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                    )
+                    Text("Save", color = if (editDisplayName.isNotBlank()) TgBlue else TextMuted, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEditDialog = false }) {
-                    Text(
-                        text = "Cancel",
-                        color = TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                    )
+                    Text("Cancel", color = TextSecondary)
                 }
             },
         )
@@ -564,53 +306,31 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { showSignOutConfirm = false },
             containerColor = ObsidianCard,
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             title = {
-                Text(
-                    text = "Sign out?",
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = PureWhite,
-                )
+                Text("Sign out?", fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = TextPrimary)
             },
             text = {
                 Text(
                     text = "You will be signed out of this device.",
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     color = TextSecondary,
                 )
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
                         showSignOutConfirm = false
                         vm.signOut()
                         onSignOut()
                     },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = PureWhite,
-                        contentColor = PureBlack,
-                    ),
-                    shape = RoundedCornerShape(8.dp),
                 ) {
-                    Text(
-                        text = "Sign out",
-                        color = PureBlack,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                    )
+                    Text("Sign out", color = TgErrorRed, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutConfirm = false }) {
-                    Text(
-                        text = "Cancel",
-                        color = TextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                    )
+                    Text("Cancel", color = TextSecondary)
                 }
             },
         )
@@ -618,37 +338,81 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun TelegramActionPill(
-    icon: ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(ObsidianCard)
-            .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center,
+private fun profileFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = TgBlue,
+    unfocusedBorderColor = HairlineBorder,
+    focusedTextColor = TextPrimary,
+    unfocusedTextColor = TextPrimary,
+    focusedLabelColor = TgBlue,
+    unfocusedLabelColor = TextMuted,
+    cursorColor = TgBlue,
+    focusedContainerColor = ObsidianCard,
+    unfocusedContainerColor = ObsidianCard,
+)
+
+/** Rounded grouped card that holds a few rows. */
+@Composable
+private fun ProfileCard(content: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(ObsidianCard),
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = PureWhite,
-                modifier = Modifier.size(20.dp),
+        content()
+    }
+}
+
+/** One row inside a [ProfileCard]: icon, value, optional caption, optional trailing content. */
+@Composable
+private fun InfoRow(
+    icon: ImageVector,
+    value: String,
+    label: String?,
+    modifier: Modifier = Modifier,
+    iconTint: androidx.compose.ui.graphics.Color = TextSecondary,
+    valueColor: androidx.compose.ui.graphics.Color = TextPrimary,
+    monospaceValue: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
+                } else {
+                    Modifier
+                },
             )
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(22.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = label,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PureWhite,
+                text = value,
+                fontSize = if (monospaceValue) 13.sp else 16.sp,
+                fontFamily = if (monospaceValue) FontFamily.Monospace else FontFamily.Default,
+                color = valueColor,
             )
+            if (label != null) {
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
+        trailing?.invoke()
     }
 }

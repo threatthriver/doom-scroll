@@ -27,12 +27,14 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,8 +57,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.securemessage.app.data.PrivacySettings
 import com.securemessage.app.ui.common.AppViewModelFactory
 import com.securemessage.app.ui.common.MonochromeAvatar
+import com.securemessage.app.ui.common.openNotificationSettings
 import com.securemessage.app.ui.theme.HairlineBorder
 import com.securemessage.app.ui.theme.HairlineBorderSubtle
 import com.securemessage.app.ui.theme.ObsidianCard
@@ -76,12 +80,7 @@ import com.securemessage.app.ui.theme.TgErrorRed
 @Composable
 fun SettingsScreen(
     onSignOut: () -> Unit,
-    onEditProfile: (String, String) -> Unit = { _, _ -> },
-    onNotificationSettings: () -> Unit = {},
-    onPrivacySettings: () -> Unit = {},
-    onChatSettings: () -> Unit = {},
-    onStorageSettings: () -> Unit = {},
-    onFolderSettings: () -> Unit = {},
+    onOpenProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
     vm: ProfileViewModel = viewModel(factory = AppViewModelFactory.Factory),
 ) {
@@ -90,6 +89,30 @@ fun SettingsScreen(
     val haptic = LocalHapticFeedback.current
     val snackbar = remember { SnackbarHostState() }
     var showSignOutConfirm by remember { mutableStateOf(false) }
+    var screenSecurity by remember { mutableStateOf(PrivacySettings.isScreenSecurityEnabled(context)) }
+    var notifPreview by remember { mutableStateOf(PrivacySettings.isNotificationPreviewEnabled(context)) }
+    fun toggleNotifPreview() {
+        notifPreview = !notifPreview
+        PrivacySettings.setNotificationPreviewEnabled(context, notifPreview)
+    }
+    var appLock by remember { mutableStateOf(PrivacySettings.isAppLockEnabled(context)) }
+    fun toggleAppLock() {
+        val activity = context as? com.securemessage.app.MainActivity
+        if (!appLock && activity != null && !activity.canAuthenticate()) {
+            android.widget.Toast.makeText(
+                context, "Set up a screen lock or fingerprint in your phone settings first", android.widget.Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+        appLock = !appLock
+        PrivacySettings.setAppLockEnabled(context, appLock)
+    }
+    fun toggleScreenSecurity() {
+        screenSecurity = !screenSecurity
+        PrivacySettings.setScreenSecurityEnabled(context, screenSecurity)
+        // Apply immediately to the running window, not just on the next resume.
+        (context as? com.securemessage.app.MainActivity)?.applyScreenSecurity()
+    }
 
     LaunchedEffect(state.userNotification) {
         state.userNotification?.let {
@@ -124,10 +147,15 @@ fun SettingsScreen(
         ) {
             Spacer(Modifier.height(16.dp))
 
-            // Profile summary
+            // Profile summary: tap to open the full profile
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(onClickLabel = "Open profile") {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onOpenProfile()
+                    }
                     .padding(vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -171,67 +199,68 @@ fun SettingsScreen(
                 Column {
                     SettingsRow(
                         icon = Icons.Filled.Person,
-                        title = "Account",
+                        title = "Profile",
                         subtitle = "Name, username and bio",
                         iconColor = SettingsIconBlue,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onEditProfile(state.displayName, state.bio)
-                        },
-                    )
-                    RowDivider()
-                    SettingsRow(
-                        icon = Icons.Filled.Palette,
-                        title = "Chat Settings",
-                        subtitle = "Theme and how chats look",
-                        iconColor = SettingsIconOrange,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onChatSettings()
+                            onOpenProfile()
                         },
                     )
                     RowDivider()
                     SettingsRow(
                         icon = Icons.Filled.Lock,
-                        title = "Privacy & Security",
-                        subtitle = "Who can see your info",
+                        title = "Encryption key",
+                        subtitle = "See your key fingerprint",
                         iconColor = SettingsIconGreen,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onPrivacySettings()
+                            onOpenProfile()
+                        },
+                    )
+                    RowDivider()
+                    SettingsRow(
+                        icon = Icons.Filled.Notifications,
+                        title = "Message text in notifications",
+                        subtitle = "Show who wrote and what (hidden on lock screen)",
+                        iconColor = SettingsIconGreen,
+                        onClick = { toggleNotifPreview() },
+                        trailing = { Switch(checked = notifPreview, onCheckedChange = { toggleNotifPreview() }) },
+                    )
+                    RowDivider()
+                    SettingsRow(
+                        icon = Icons.Filled.Lock,
+                        title = "App lock",
+                        subtitle = "Ask for fingerprint, face or screen lock",
+                        iconColor = SettingsIconOrange,
+                        onClick = { toggleAppLock() },
+                        trailing = { Switch(checked = appLock, onCheckedChange = { toggleAppLock() }) },
+                    )
+                    RowDivider()
+                    SettingsRow(
+                        icon = Icons.Filled.Visibility,
+                        title = "Screen security",
+                        subtitle = "Block screenshots and hide app preview",
+                        iconColor = SettingsIconIndigo,
+                        onClick = { toggleScreenSecurity() },
+                        trailing = {
+                            Switch(
+                                checked = screenSecurity,
+                                onCheckedChange = { toggleScreenSecurity() },
+                            )
                         },
                     )
                     RowDivider()
                     SettingsRow(
                         icon = Icons.Filled.Notifications,
                         title = "Notifications",
-                        subtitle = "Sounds and alerts",
+                        subtitle = if (com.securemessage.app.data.notify.MessageNotifier.messageAlertsEnabled(context))
+                            "On. Sounds and alerts in system settings"
+                        else "OFF. Tap to turn on message alerts",
                         iconColor = SettingsIconRed,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onNotificationSettings()
-                        },
-                    )
-                    RowDivider()
-                    SettingsRow(
-                        icon = Icons.Filled.Storage,
-                        title = "Data and Storage",
-                        subtitle = "Storage and downloads",
-                        iconColor = SettingsIconIndigo,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onStorageSettings()
-                        },
-                    )
-                    RowDivider()
-                    SettingsRow(
-                        icon = Icons.Filled.Folder,
-                        title = "Chat Folders",
-                        subtitle = "Sort chats into folders",
-                        iconColor = SettingsIconBlue,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onFolderSettings()
+                            openNotificationSettings(context)
                         },
                     )
                 }
@@ -277,7 +306,7 @@ fun SettingsScreen(
                         // weight(1f) is what keeps the button from being squeezed
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Chat updates",
+                                text = "Hush updates",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = PureWhite,
@@ -581,6 +610,7 @@ private fun SettingsRow(
     subtitle: String,
     iconColor: Color,
     onClick: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -618,11 +648,15 @@ private fun SettingsRow(
                 color = TextMuted,
             )
         }
-        Icon(
-            imageVector = Icons.Filled.ChevronRight,
-            contentDescription = null,
-            tint = TextMuted,
-            modifier = Modifier.size(18.dp),
-        )
+        if (trailing != null) {
+            trailing()
+        } else {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = TextMuted,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }

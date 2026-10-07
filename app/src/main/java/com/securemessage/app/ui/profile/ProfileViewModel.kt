@@ -162,7 +162,7 @@ class ProfileViewModel(
                             appContext?.let { markSilentChecked(it) }
                             val release = updateState.release
                             val sizeMb = if (release.apkSize > 0) {
-                                String.format("%.1f MB", release.apkSize / (1024.0 * 1024.0))
+                                String.format(java.util.Locale.US, "%.1f MB", release.apkSize / (1024.0 * 1024.0))
                             } else {
                                 ""
                             }
@@ -270,9 +270,9 @@ class ProfileViewModel(
                         val downloadedMb = updateState.downloadedBytes / (1024f * 1024f)
                         val totalMb = updateState.totalBytes / (1024f * 1024f)
                         val text = if (totalMb > 0) {
-                            String.format("%.1f of %.1f MB", downloadedMb, totalMb)
+                            String.format(java.util.Locale.US, "%.1f of %.1f MB", downloadedMb, totalMb)
                         } else {
-                            String.format("%.1f MB downloaded", downloadedMb)
+                            String.format(java.util.Locale.US, "%.1f MB downloaded", downloadedMb)
                         }
                         _state.update {
                             it.copy(
@@ -390,9 +390,12 @@ class ProfileViewModel(
         _state.update { it.copy(userNotification = null) }
     }
 
+    /**
+     * Stops any update download. The actual sign-out (push-token cleanup, then auth) is done by
+     * ConversationsViewModel.signOut so it happens exactly once and in the right order.
+     */
     fun signOut() {
         downloadJob?.cancel()
-        authRepo.signOut()
     }
 
     companion object {

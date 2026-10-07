@@ -5,15 +5,29 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.securemessage.app.data.PrivacySettings
 import com.securemessage.app.data.notify.MessageNotifier
 import com.securemessage.app.data.update.GitHubUpdateManager
 import com.securemessage.app.data.update.UpdateNotifier
@@ -23,7 +37,11 @@ import com.securemessage.app.ui.nav.AppNavHost
 import com.securemessage.app.ui.theme.SecureMessageTheme
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    /** True while the app lock is covering the UI. */
+    private var locked by mutableStateOf(false)
+    private var promptShowing = false
 
     /** True when the activity was opened from the update notification (cold start or tap). */
     private var openUpdatesRequested by mutableStateOf(false)
@@ -45,13 +63,23 @@ class MainActivity : ComponentActivity() {
         maybeRequestNotificationPermission()
         checkUpdatesForTray()
         val container = (application as SecureMessageApp).container
+        locked = PrivacySettings.isAppLockEnabled(this) && canAuthenticate()
         setContent {
             SecureMessageTheme {
-                AppNavHost(
-                    container,
-                    openUpdates = openUpdatesRequested,
-                    openChatId = openChatRequested
-                )
+                Box(Modifier.fillMaxSize()) {
+                    AppNavHost(
+                        container,
+                        openUpdates = openUpdatesRequested,
+                        openChatId = openChatRequested
+                    )
+                    if (locked) {
+                        // Opaque cover: nothing of the chats is visible until you unlock.
+                        Box(
+                            Modifier.fillMaxSize().background(Color.Black).clickable { showUnlockPrompt() },
+                            contentAlignment = Alignment.Center,
+                        ) { Text("Hush is locked. Tap to unlock.", color = Color.White) }
+                    }
+                }
             }
         }
     }
@@ -66,6 +94,61 @@ class MainActivity : ComponentActivity() {
         }
         intent.getStringExtra(MessageNotifier.EXTRA_OPEN_CHAT)?.let { chatId ->
             openChatRequested = chatId
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (PrivacySettings.isAppLockEnabled(this) && canAuthenticate()) locked = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyScreenSecurity()
+        if (locked) showUnlockPrompt()
+    }
+
+    private val authenticators = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
+
+    /** False when the phone has no fingerprint/face/screen lock set up: the lock can't work then. */
+    fun canAuthenticate(): Boolean =
+        BiometricManager.from(this).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+
+    private fun showUnlockPrompt() {
+        if (promptShowing || !canAuthenticate()) {
+            if (!canAuthenticate()) locked = false
+            return
+        }
+        promptShowing = true
+        val prompt = BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    promptShowing = false
+                    locked = false
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    // Stay locked; tapping the cover tries again.
+                    promptShowing = false
+                }
+            },
+        )
+        prompt.authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock Hush")
+                .setAllowedAuthenticators(authenticators)
+                .build(),
+        )
+    }
+
+    /** Re-read on every resume so toggling it in Settings takes effect when coming back. */
+    fun applyScreenSecurity() {
+        if (PrivacySettings.isScreenSecurityEnabled(this)) {
+            window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 

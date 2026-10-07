@@ -7,17 +7,26 @@ import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 import com.securemessage.app.data.chatIdFor
 import com.securemessage.app.data.model.Chat
 import com.securemessage.app.data.model.Message
 import com.securemessage.app.data.model.User
+import com.securemessage.app.data.push.PushNotifier
 import com.securemessage.app.data.repo.ChatRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepository {
+class FirestoreChatRepository(
+    private val db: FirebaseFirestore,
+    /** Asks the push relay to alert the recipient. Never affects whether sending succeeds. */
+    private val pushNotifier: PushNotifier? = null,
+    private val scope: CoroutineScope? = null,
+) : ChatRepository {
 
     private val chats get() = db.collection("chats")
 
@@ -47,7 +56,11 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
     }.onFailure { Log.e(TAG, "openChat failed", it) }
 
     override suspend fun getChat(chatId: String): Result<Chat> = runCatching {
-        val doc = chats.document(chatId).get().await()
+        val ref = chats.document(chatId)
+        // The chat list keeps this document in the local cache, so read it from there first:
+        // opening a chat must not wait for the network. Fall back to the server if it isn't cached.
+        val cached = runCatching { ref.get(Source.CACHE).await() }.getOrNull()
+        val doc = if (cached != null && cached.exists()) cached else ref.get().await()
         if (!doc.exists()) throw NoSuchElementException("No chat $chatId")
         doc.toChat()
     }.onFailure { Log.w(TAG, "getChat failed", it) }
@@ -74,6 +87,7 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         replyToId: String,
         replyToText: String,
         replyToSender: String,
+        recipientIds: List<String>?,
     ): Result<Unit> = runCatching {
         val chatRef = chats.document(chatId)
         val batch = db.batch()
@@ -88,31 +102,73 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         // them without a second read. (Message creates have no field allow-list.)
         if (replyToId.isNotEmpty()) {
             messageData["replyToId"] = replyToId
-            messageData["replyToText"] = replyToText.take(MAX_REPLY_QUOTE_CHARS)
+            messageData["replyToText"] = replyToText.take(MAX_REPLY_QUOTE_STORED_CHARS)
             messageData["replyToSender"] = replyToSender
         }
         batch.set(msgRef, messageData)
-        // Increment unread count for other participants. Dot-notation paths update each
-        // recipient's counter atomically without replacing the whole map (the old code
-        // wrote the entire "unreadCount" map in one shot, which could wipe counters).
+        // Bump unread for the other participants. A NESTED map in a merge-set increments just
+        // those keys atomically. (A dotted key like "unreadCount.<uid>" in set() is NOT a path:
+        // it would be stored as one literal top-level field and the counter would never move.)
         // Metadata uses merge-set so a first message to a fresh chat can't fail the batch.
-        val chat = chatRef.get().await()
-        val participants = (chat.get("participants") as? List<*>)
-            ?.mapNotNull { it?.toString() }
-            .orEmpty()
-            .filter { it != senderId }
+        val participants = (recipientIds ?: run {
+            // Fallback only: a server read here delays the whole send.
+            val chat = chatRef.get().await()
+            (chat.get("participants") as? List<*>)?.mapNotNull { it?.toString() }.orEmpty()
+        }).filter { it != senderId }
         val metadata = mutableMapOf<String, Any>(
             "lastMessage" to text,
             "lastMessageAt" to FieldValue.serverTimestamp(),
             "lastSenderId" to senderId,
         )
-        participants.forEach { uid ->
-            metadata["unreadCount.$uid"] = FieldValue.increment(1)
+        if (participants.isNotEmpty()) {
+            metadata["unreadCount"] = participants.associateWith { FieldValue.increment(1) }
         }
         batch.set(chatRef, metadata, SetOptions.merge())
         batch.commit().await()
+        // The message is saved; now tell the relay so the other phone gets an alert even if the
+        // app there is closed. Runs in the background and failures are only logged.
+        if (pushNotifier != null && scope != null) {
+            val messageId = msgRef.id
+            scope.launch { pushNotifier.messageSent(chatId, messageId) }
+        }
         Unit
     }.onFailure { Log.w(TAG, "sendMessage failed", it) }
+
+    override suspend fun getChatFresh(chatId: String): Result<Chat> = runCatching {
+        val doc = chats.document(chatId).get(Source.SERVER).await()
+        if (!doc.exists()) throw NoSuchElementException("No chat $chatId")
+        doc.toChat()
+    }
+
+    override fun observeChat(chatId: String): Flow<Chat> = callbackFlow {
+        val reg = chats.document(chatId).addSnapshotListener { snap, e ->
+            if (e != null) {
+                Log.w(TAG, "observeChat failed", e)
+                close()
+                return@addSnapshotListener
+            }
+            if (snap != null && snap.exists()) trySend(snap.toChat())
+        }
+        awaitClose { reg.remove() }
+    }
+
+    override suspend fun setTyping(chatId: String, userId: String, value: Long): Result<Unit> = runCatching {
+        chats.document(chatId).set(mapOf("typing" to mapOf(userId to value)), SetOptions.merge()).await()
+        Unit
+    }
+
+    override suspend fun editMessage(
+        chatId: String,
+        messageId: String,
+        text: String,
+        updatePreview: Boolean,
+    ): Result<Unit> = runCatching {
+        val chatRef = chats.document(chatId)
+        chatRef.collection("messages").document(messageId)
+            .update(mapOf("text" to text, "edited" to true)).await()
+        if (updatePreview) chatRef.update("lastMessage", text).await()
+        Unit
+    }.onFailure { Log.w(TAG, "editMessage failed", it) }
 
     override suspend fun deleteMessage(chatId: String, messageId: String): Result<Unit> = runCatching {
         val chatRef = chats.document(chatId)
@@ -215,6 +271,9 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         muted = FirestoreCoerce.booleanMap(get("muted")),
         pinned = FirestoreCoerce.bool(get("pinned")),
         archived = FirestoreCoerce.booleanMap(get("archived")),
+        typing = (get("typing") as? Map<*, *>).orEmpty().mapNotNull { (k, v) ->
+            (k as? String)?.let { it to ((v as? Number)?.toLong() ?: 0L) }
+        }.toMap(),
     )
 
     private fun DocumentSnapshot.toMessage() = Message(
@@ -226,11 +285,15 @@ class FirestoreChatRepository(private val db: FirebaseFirestore) : ChatRepositor
         replyToId = getString("replyToId").orEmpty(),
         replyToText = getString("replyToText").orEmpty(),
         replyToSender = getString("replyToSender").orEmpty(),
+        edited = FirestoreCoerce.bool(get("edited")),
     )
 
     private companion object {
         const val TAG = "ChatRepo"
-        /** Quoted reply preview is capped so one reply can't balloon a message doc. */
-        const val MAX_REPLY_QUOTE_CHARS = 300
+        /**
+         * Safety cap on the stored quote. The quote is encrypted (base64) before it gets here, so
+         * this must stay well above the 300-char plaintext limit or it would cut the ciphertext.
+         */
+        const val MAX_REPLY_QUOTE_STORED_CHARS = 2000
     }
 }

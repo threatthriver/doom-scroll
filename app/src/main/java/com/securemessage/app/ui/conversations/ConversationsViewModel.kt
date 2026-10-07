@@ -2,10 +2,13 @@ package com.securemessage.app.ui.conversations
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.securemessage.app.data.AuthGate
 import com.securemessage.app.data.model.Chat
 import com.securemessage.app.data.repo.AuthRepository
 import com.securemessage.app.data.repo.ChatRepository
+import com.securemessage.app.data.repo.PushTokenRepository
 import com.securemessage.app.data.repo.UserRepository
+import com.securemessage.app.data.repo.signOutEverywhere
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +23,8 @@ data class ConversationsUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val needsProfile: Boolean = false,
+    /** Signed in but the email isn't verified: chats are locked until it is. */
+    val needsVerification: Boolean = false,
     /** Our own Firestore display name (FirebaseAuth's copy is stale/empty). */
     val myDisplayName: String = "",
 ) {
@@ -30,19 +35,26 @@ class ConversationsViewModel(
     private val authRepo: AuthRepository,
     private val chatRepo: ChatRepository,
     private val userRepo: UserRepository,
+    private val pushRepo: PushTokenRepository,
 ) : ViewModel() {
 
     /** Read live: the cached-uid version went stale across sign-out/sign-in. */
     val myUid: String? get() = authRepo.currentUserId
 
-    private val _state = MutableStateFlow(ConversationsUiState(isLoading = myUid != null))
+    private val canAccess = AuthGate.canAccessChats(myUid != null, authRepo.isEmailVerified)
+
+    private val _state = MutableStateFlow(
+        ConversationsUiState(isLoading = canAccess, needsVerification = myUid != null && !canAccess),
+    )
     val state: StateFlow<ConversationsUiState> = _state.asStateFlow()
 
     /** Chat ids with an archive toggle in flight, to block double taps. */
     private val archivePending = mutableSetOf<String>()
 
     init {
-        myUid?.let { uid ->
+        // Unverified users never start the chat listener; the screen sends them to Verify Email.
+        myUid?.takeIf { canAccess }?.let { uid ->
+            viewModelScope.launch { pushRepo.registerCurrentToken() }
             viewModelScope.launch {
                 userRepo.getUser(uid)
                     .onSuccess { user ->
@@ -115,7 +127,13 @@ class ConversationsViewModel(
         }
     }
 
-    fun signOut() = authRepo.signOut()
+    /** Removes this device's push token (needs auth), signs out, then calls [onDone]. */
+    fun signOut(onDone: () -> Unit) {
+        viewModelScope.launch {
+            signOutEverywhere(authRepo, pushRepo)
+            onDone()
+        }
+    }
 
     companion object {
         /** Newest first; chats with no message yet go last. Pinned chats always first. */

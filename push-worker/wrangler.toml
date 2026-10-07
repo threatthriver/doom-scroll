@@ -1,0 +1,13 @@
+name = "hush-push"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[vars]
+FIREBASE_PROJECT_ID = "secure-message-app-0602"
+
+[observability]
+enabled = true
+
+# Secret (set with `wrangler secret put SERVICE_ACCOUNT`, never committed):
+#   SERVICE_ACCOUNT = the JSON key of the hush-push service account

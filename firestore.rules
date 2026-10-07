@@ -1,24 +1,49 @@
 rules_version = '2';
+// Compatibility rules: what is deployed while app versions 1.3.x and 1.4.x are both in use.
+// Starts from the rules that were live on 2026-10-03 and only ADDS what current apps need:
+//   * users/{uid}/fcmTokens  - push tokens (without this, no device can ever be sent a push)
+//   * publicKeys/{uid}       - E2EE key exchange (without this, chats silently stay unencrypted)
+//   * profile create without emailLower, and name/bio edits (current apps never store an email)
+//   * message reactions      - each person may set or clear only their own
+// Nothing that worked before is denied now. The stricter target rules are in firestore.rules.next;
+// switch to them once nobody runs 1.3.x anymore.
 service cloud.firestore {
   match /databases/{database}/documents {
-
     function isSignedIn() {
       return request.auth != null;
     }
 
     // Public profiles. Created once, in the same batch as the username claim.
-    // Email is deliberately NOT stored here (this doc is world-readable to signed-in
-    // users); it lives only in Firebase Auth. Writing an email field is rejected.
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == uid
         && request.resource.data.uid == uid
-        && !('emailLower' in request.resource.data)
+        // Current apps keep the email out of this world-readable doc. Very old apps sent it,
+        // so it is still accepted, but only if it is the caller's own address.
+        && (!('emailLower' in request.resource.data)
+            || request.resource.data.emailLower == request.auth.token.email.lower())
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if isSignedIn() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['displayName', 'bio', 'photoUrl']);
+            .hasOnly(['displayName', 'bio', 'photoUrl'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 50
+        && request.resource.data.get('bio', '') is string
+        && request.resource.data.get('bio', '').size() <= 160
+        && request.resource.data.get('photoUrl', '') is string
+        && request.resource.data.get('photoUrl', '').size() <= 500;
       allow delete: if isSignedIn() && request.auth.uid == uid;
+
+      // FCM push tokens: owner-only, never part of the public profile. Doc id = token.
+      match /fcmTokens/{token} {
+        allow read, delete: if isSignedIn() && request.auth.uid == uid;
+        allow create, update: if isSignedIn() && request.auth.uid == uid
+          && token.size() <= 4096
+          && request.resource.data.keys().hasOnly(['createdAt', 'platform'])
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.platform == 'android';
+      }
     }
 
     // Username uniqueness claims. Create-only; a set on an existing doc is an update and is denied.
@@ -32,16 +57,12 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
-    // Chats: only participants may read/write.
+    // Chats: only participants may read/write. (Unchanged from the live rules.)
     match /chats/{chatId} {
-      allow read, delete: if isSignedIn()
+      allow read, update, delete: if isSignedIn()
         && request.auth.uid in resource.data.participants;
       allow create: if isSignedIn()
         && request.auth.uid in request.resource.data.participants;
-      allow update: if isSignedIn()
-        && request.auth.uid in resource.data.participants
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'unreadCount', 'muted', 'pinned', 'archived', 'participantNames']);
 
       // Messages inherit access from the parent chat's participants.
       match /messages/{messageId} {
@@ -50,17 +71,40 @@ service cloud.firestore {
         allow create: if isSignedIn()
           && request.resource.data.senderId == request.auth.uid
           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow update: if false;
+        // Only reactions may change, and only the caller's own entry.
+        allow update: if isSignedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+          && request.resource.data.reactions is map
+          && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys()
+               .hasOnly([request.auth.uid])
+          && (!(request.auth.uid in request.resource.data.reactions)
+              || (request.resource.data.reactions[request.auth.uid] is string
+                  && request.resource.data.reactions[request.auth.uid].size() > 0
+                  && request.resource.data.reactions[request.auth.uid].size() <= 16));
+        // Editing: only the sender may change the text, and only to a non-empty string (flagged edited).
+        allow update: if isSignedIn()
+          && resource.data.senderId == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'edited'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 8000
+          && request.resource.data.edited == true;
         allow delete: if isSignedIn()
           && resource.data.senderId == request.auth.uid
           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       }
     }
 
-    // Public keys for E2EE key exchange.
+    // Public keys for E2EE key exchange: anyone signed in may read, only the owner may write.
     match /publicKeys/{uid} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && request.auth.uid == uid;
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['publicKey', 'updatedAt'])
+        && request.resource.data.publicKey is string
+        && request.resource.data.publicKey.size() > 0
+        && request.resource.data.publicKey.size() <= 1000;
       allow delete: if false;
     }
 

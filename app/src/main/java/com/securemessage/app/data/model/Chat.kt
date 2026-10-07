@@ -14,4 +14,6 @@ data class Chat(
     val muted: Map<String, Boolean> = emptyMap(), // userId -> muted
     val pinned: Boolean = false,
     val archived: Map<String, Boolean> = emptyMap(), // userId -> archived
+    /** userId -> a number that changes while that person types (0 = stopped). */
+    val typing: Map<String, Long> = emptyMap(),
 )

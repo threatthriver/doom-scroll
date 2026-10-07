@@ -21,8 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,8 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,15 +49,12 @@ import com.securemessage.app.data.model.User
 import com.securemessage.app.ui.common.AppViewModelFactory
 import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.common.MonochromeSearchBar
-import com.securemessage.app.ui.theme.HairlineBorder
-import com.securemessage.app.ui.theme.HairlineBorderSubtle
 import com.securemessage.app.ui.theme.ObsidianCard
+import com.securemessage.app.ui.theme.ObsidianCardHover
 import com.securemessage.app.ui.theme.ObsidianVoid
-import com.securemessage.app.ui.theme.PureBlack
 import com.securemessage.app.ui.theme.PureWhite
-import com.securemessage.app.ui.theme.TextMuted
-import com.securemessage.app.ui.theme.TextPrimary
 import com.securemessage.app.ui.theme.TextSecondary
+import com.securemessage.app.ui.theme.TgBlue
 
 @Composable
 fun UserSearchScreen(
@@ -93,11 +91,11 @@ fun UserSearchScreen(
                 .fillMaxSize()
                 .padding(horizontal = 20.dp),
         ) {
-            Spacer(Modifier.height(16.dp))
-
             // Header
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -105,42 +103,29 @@ fun UserSearchScreen(
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
-                            .background(ObsidianCard)
-                            .border(1.dp, HairlineBorder, CircleShape),
+                            .background(ObsidianCard),
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = PureWhite,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
-                Column {
-                    Text(
-                        text = "FIND PEOPLE",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = TextMuted,
-                        letterSpacing = 1.2.sp,
-                    )
-                    Text(
-                        text = "CONTACTS",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.SansSerif,
-                        color = PureWhite,
-                        letterSpacing = (-0.5).sp,
-                    )
-                }
+                Text(
+                    text = "Contacts",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PureWhite,
+                    letterSpacing = (-0.5).sp,
+                )
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
 
-            // Search Bar matching Telegram Contacts search
             MonochromeSearchBar(
                 query = state.query,
                 onQueryChange = vm::onQueryChange,
@@ -148,15 +133,7 @@ fun UserSearchScreen(
                 onClear = { vm.onQueryChange("") },
             )
 
-            Spacer(Modifier.height(16.dp))
-
-            // Dividing hairline
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(HairlineBorderSubtle),
-            )
+            Spacer(Modifier.height(12.dp))
 
             // Results Container
             Box(
@@ -167,7 +144,7 @@ fun UserSearchScreen(
                 when {
                     state.isLoading -> {
                         CircularProgressIndicator(
-                            color = PureWhite,
+                            color = TgBlue,
                             strokeWidth = 2.dp,
                             modifier = Modifier
                                 .align(Alignment.Center)
@@ -176,82 +153,36 @@ fun UserSearchScreen(
                     }
 
                     state.searchError != null -> {
-                        Text(
-                            text = state.searchError!!,
-                            color = PureWhite,
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(24.dp),
+                        UserSearchMessage(
+                            icon = Icons.Filled.ErrorOutline,
+                            title = "Search failed",
+                            body = state.searchError!!,
+                            modifier = Modifier.align(Alignment.Center),
                         )
                     }
 
                     state.hasSearched && state.results.isEmpty() -> {
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Text(
-                                text = "No one found",
-                                color = PureWhite,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = "Check the spelling and try again.",
-                                color = TextMuted,
-                                fontSize = 14.sp,
-                            )
-                        }
+                        UserSearchMessage(
+                            icon = Icons.Filled.PersonSearch,
+                            title = "No one found",
+                            body = "Check the spelling and try again.",
+                            modifier = Modifier.align(Alignment.Center),
+                        )
                     }
 
                     !state.hasSearched -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = 28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(CircleShape)
-                                    .background(ObsidianCard)
-                                    .border(1.dp, HairlineBorder, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Sensors,
-                                    contentDescription = null,
-                                    tint = PureWhite,
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                text = "Find someone to chat with",
-                                color = PureWhite,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = "Type a username or email above.",
-                                color = TextMuted,
-                                fontSize = 14.sp,
-                            )
-                        }
+                        UserSearchMessage(
+                            icon = Icons.Filled.PersonSearch,
+                            title = "Find someone to chat with",
+                            body = "Type a username or email above.",
+                            modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp),
+                        )
                     }
 
                     else -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(top = 10.dp, bottom = 120.dp),
+                            contentPadding = PaddingValues(top = 4.dp, bottom = 140.dp),
                         ) {
                             items(state.results, key = { it.uid }) { user ->
                                 UserSearchRow(
@@ -288,68 +219,86 @@ private fun UserSearchRow(
         .joinToString("")
         .ifEmpty { user.username.take(2).uppercase() }
 
-    Box(
+    // Flat Telegram-style row: whole row is the tap target (min 56dp high).
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(ObsidianCard)
-            .border(1.dp, HairlineBorder, RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(14.dp),
+            .clickable(onClickLabel = "Chat with ${user.displayName}", onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            MonochromeAvatar(
-                initials = initials,
-                size = 46.dp,
+        MonochromeAvatar(
+            initials = initials,
+            size = 50.dp,
+        )
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = user.displayName,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = PureWhite,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = user.displayName,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PureWhite,
-                )
-                Text(
-                    text = "@${user.username}",
-                    fontSize = 12.sp,
-                    color = TextSecondary,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-
-            // Direct connect pill button
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(PureWhite)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.ChatBubbleOutline,
-                        contentDescription = null,
-                        tint = PureBlack,
-                        modifier = Modifier.size(13.dp),
-                    )
-                    Text(
-                        text = "CHAT",
-                        color = PureBlack,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.5.sp,
-                    )
-                }
-            }
+            Text(
+                text = "@${user.username}",
+                fontSize = 14.sp,
+                color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
+
+        Icon(
+            imageVector = Icons.Filled.ChatBubbleOutline,
+            contentDescription = null,
+            tint = TgBlue,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+@Composable
+private fun UserSearchMessage(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(ObsidianCardHover),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TgBlue,
+                modifier = Modifier.size(32.dp),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = title,
+            color = PureWhite,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = body,
+            color = TextSecondary,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }

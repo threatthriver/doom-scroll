@@ -25,3 +25,6 @@ serviceAccountKey*.json
 .env.*
 !.env.example
 secrets/
+keystore.properties
+firestore-debug.log
+firebase.emu.json

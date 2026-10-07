@@ -35,7 +35,7 @@ object UpdateNotifier {
             "App updates",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Notifies when a new Chat version is ready to install"
+            description = "Notifies when a new Hush version is ready to install"
         }
         manager.createNotificationChannel(channel)
     }
@@ -71,7 +71,7 @@ object UpdateNotifier {
         val version = release.tagName.removePrefix("v").removePrefix("V")
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("Chat $version is ready")
+            .setContentTitle("Hush $version is ready")
             .setContentText("Tap to open updates and install the new version.")
             .setStyle(
                 NotificationCompat.BigTextStyle()
@@ -81,8 +81,10 @@ object UpdateNotifier {
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .build()
-        runCatching {
+        try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_UPDATE, notification)
+        } catch (e: SecurityException) {
+            // Permission revoked between the canNotify() check and now: nothing to show.
         }
     }
 
@@ -97,8 +99,10 @@ object UpdateNotifier {
             .setContentIntent(updatesPendingIntent(context))
             .setAutoCancel(true)
             .build()
-        runCatching {
+        try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_UPDATE, notification)
+        } catch (e: SecurityException) {
+            // Permission revoked between the canNotify() check and now: nothing to show.
         }
     }
 

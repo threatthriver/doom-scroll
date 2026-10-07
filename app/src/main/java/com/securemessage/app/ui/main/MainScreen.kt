@@ -4,7 +4,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +37,7 @@ import com.securemessage.app.ui.users.UserSearchScreen
 fun MainScreen(
     onOpenChat: (String) -> Unit,
     onNeedsProfile: () -> Unit,
+    onNeedsVerification: () -> Unit,
     onSignedOut: () -> Unit,
     onEditProfile: (String, String) -> Unit = { _, _ -> },
     conversationsVm: ConversationsViewModel = viewModel(factory = AppViewModelFactory.Factory),
@@ -68,20 +72,27 @@ fun MainScreen(
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
+        // Keeps each tab's scroll position and typed text while you visit another tab.
+        val tabState = rememberSaveableStateHolder()
         AnimatedContent(
             targetState = selectedTab,
             transitionSpec = {
-                fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
+                // The new tab drifts in from the side it sits on in the dock.
+                val dir = if (targetState.ordinal >= initialState.ordinal) 1 else -1
+                (fadeIn(tween(240, delayMillis = 40)) + slideInHorizontally(tween(300)) { dir * it / 12 }) togetherWith
+                    (fadeOut(tween(140)) + slideOutHorizontally(tween(300)) { -dir * it / 12 })
             },
             label = "tab_transition",
             modifier = Modifier.fillMaxSize(),
         ) { tab ->
+            tabState.SaveableStateProvider(tab.name) {
             when (tab) {
                 NavTab.CHATS -> {
                     ConversationsScreen(
                         onNewChat = { selectedTab = NavTab.CONTACTS },
                         onOpenChat = onOpenChat,
                         onNeedsProfile = onNeedsProfile,
+                        onNeedsVerification = onNeedsVerification,
                         onSignedOut = onSignedOut,
                         vm = conversationsVm,
                     )
@@ -97,11 +108,8 @@ fun MainScreen(
 
                 NavTab.SETTINGS -> {
                     com.securemessage.app.ui.profile.SettingsScreen(
-                        onSignOut = {
-                            conversationsVm.signOut()
-                            onSignedOut()
-                        },
-                        onEditProfile = onEditProfile,
+                        onSignOut = { conversationsVm.signOut(onSignedOut) },
+                        onOpenProfile = { selectedTab = NavTab.PROFILE },
                     )
                 }
 
@@ -110,13 +118,11 @@ fun MainScreen(
                         displayName = displayName,
                         email = email,
                         uid = uid,
-                        onSignOut = {
-                            conversationsVm.signOut()
-                            onSignedOut()
-                        },
+                        onSignOut = { conversationsVm.signOut(onSignedOut) },
                         onEditProfile = onEditProfile,
                     )
                 }
+            }
             }
         }
 

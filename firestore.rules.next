@@ -1,0 +1,230 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Chats and messages require a verified email (Google accounts are verified by the provider).
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // A map field that may only change under the caller's own key, and only to a value of the right type.
+    function onlyMyKeyChanged(field) {
+      return request.resource.data[field].diff(resource.data.get(field, {})).affectedKeys()
+        .hasOnly([request.auth.uid]);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Public profiles. Created once, in the same batch as the username claim.
+    // Email is deliberately NOT stored here (this doc is readable by every signed-in user);
+    // it lives only in Firebase Auth. Writing an email field is rejected.
+    // ---------------------------------------------------------------------------------------
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['uid', 'username', 'displayName', 'photoUrl', 'bio', 'createdAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 50
+        && request.resource.data.get('bio', '') is string
+        && request.resource.data.get('bio', '').size() <= 160
+        && request.resource.data.get('photoUrl', '') is string
+        && request.resource.data.get('photoUrl', '').size() <= 500
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
+      allow update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['displayName', 'bio', 'photoUrl'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() > 0
+        && request.resource.data.displayName.size() <= 50
+        && request.resource.data.bio is string
+        && request.resource.data.bio.size() <= 160
+        && request.resource.data.photoUrl is string
+        && request.resource.data.photoUrl.size() <= 500;
+      allow delete: if false;
+
+      // FCM tokens: owner-only, never part of the public profile. Doc id = token.
+      match /fcmTokens/{token} {
+        allow read, delete: if isSignedIn() && request.auth.uid == uid;
+        allow create, update: if isSignedIn() && request.auth.uid == uid
+          && token.size() <= 4096
+          && request.resource.data.keys().hasOnly(['createdAt', 'platform'])
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.platform == 'android';
+      }
+    }
+
+    // Username uniqueness claims. Create-only; a set on an existing doc is an update and is denied.
+    match /usernames/{username} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && username.matches('^[a-z0-9_]{3,20}$')
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
+      allow update: if false;
+      allow delete: if false;   // a released username is a squatting / impersonation risk
+    }
+
+    function displayNameOf(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.displayName;
+    }
+
+    // Message bodies are end-to-end encrypted (base64 ciphertext), which is longer than the plaintext.
+    function isValidBody(t) {
+      return t is string && t.size() > 0 && t.size() <= 9000;
+    }
+
+    // 1:1 chat: id is "<lowUid>_<highUid>", names are copied from the users' public profiles so
+    // nobody can create a chat that shows a spoofed name for the other person.
+    function isValidNewChat(chatId) {
+      let d = request.resource.data;
+      let p = d.participants;
+      return d.keys().hasOnly(['participants', 'participantNames'])
+        && d.keys().hasAll(['participants', 'participantNames'])
+        && p is list && p.size() == 2
+        && request.auth.uid in p
+        && p[0] is string && p[1] is string
+        && p[0] < p[1]
+        && chatId == p[0] + '_' + p[1]
+        && d.participantNames is map
+        && d.participantNames.keys().hasOnly([p[0], p[1]])
+        && d.participantNames.keys().hasAll([p[0], p[1]])
+        && d.participantNames[p[0]] == displayNameOf(p[0])
+        && d.participantNames[p[1]] == displayNameOf(p[1]);
+    }
+
+    // Names may only be refreshed to the person's current public display name (or stay as they were).
+    function nameOk(p) {
+      let d = request.resource.data.participantNames;
+      return d[p] == resource.data.participantNames[p] || d[p] == displayNameOf(p);
+    }
+    function isValidNameRefresh() {
+      let p = resource.data.participants;
+      let d = request.resource.data.participantNames;
+      return d is map
+        && d.keys().hasOnly([p[0], p[1]])
+        && d.keys().hasAll([p[0], p[1]])
+        && nameOk(p[0])
+        && nameOk(p[1]);
+    }
+
+    // Preview fields: the body is bounded ciphertext, and lastSenderId is a participant (or empty
+    // once the last message was deleted). Note: the preview is not tied to a real message doc.
+    function isValidPreview(changed) {
+      let d = request.resource.data;
+      return (!changed.hasAny(['lastMessage']) || d.lastMessage == '' || isValidBody(d.lastMessage))
+        && (!changed.hasAny(['lastSenderId'])
+            || d.lastSenderId == ''
+            || d.lastSenderId in resource.data.participants);
+    }
+
+    // Unread counters: the caller may only reset their own, or bump the other person's by exactly 1.
+    function unreadStepOk(uid, changed) {
+      let old = resource.data.get('unreadCount', {}).get(uid, 0);
+      let now = request.resource.data.unreadCount.get(uid, 0);
+      return !changed.hasAny([uid])
+        || (uid == request.auth.uid ? now == 0 : (now is int && now == old + 1));
+    }
+    function isValidUnread(changed) {
+      let p = resource.data.participants;
+      let d = request.resource.data;
+      return !changed.hasAny(['unreadCount'])
+        || (d.unreadCount is map
+            && d.unreadCount.diff(resource.data.get('unreadCount', {})).affectedKeys().hasOnly([p[0], p[1]])
+            && unreadStepOk(p[0], d.unreadCount.diff(resource.data.get('unreadCount', {})).affectedKeys())
+            && unreadStepOk(p[1], d.unreadCount.diff(resource.data.get('unreadCount', {})).affectedKeys()));
+    }
+
+    function isValidBoolMap(field, changed) {
+      return !changed.hasAny([field])
+        || (request.resource.data[field] is map
+            && onlyMyKeyChanged(field)
+            && request.resource.data[field][request.auth.uid] is bool);
+    }
+
+    // Chats: only verified participants. Participants are immutable; chats are never deleted.
+    match /chats/{chatId} {
+      allow read: if isVerified()
+        && request.auth.uid in resource.data.participants;
+      allow create: if isVerified() && isValidNewChat(chatId);
+      allow update: if isVerified()
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastMessage', 'lastMessageAt', 'lastSenderId', 'unreadCount', 'muted', 'pinned', 'archived', 'participantNames'])
+        && isValidPreview(request.resource.data.diff(resource.data).affectedKeys())
+        && isValidUnread(request.resource.data.diff(resource.data).affectedKeys())
+        && isValidBoolMap('muted', request.resource.data.diff(resource.data).affectedKeys())
+        && isValidBoolMap('archived', request.resource.data.diff(resource.data).affectedKeys())
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['pinned'])
+            || request.resource.data.pinned is bool)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['participantNames'])
+            || isValidNameRefresh());
+      allow delete: if false;
+
+      // Messages: participants read; senders create their own; only reactions can change afterwards.
+      match /messages/{messageId} {
+        allow read: if isVerified()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+        allow create: if isVerified()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.keys().hasOnly(
+               ['text', 'senderId', 'timestamp', 'reactions', 'replyToId', 'replyToText', 'replyToSender'])
+          && request.resource.data.keys().hasAll(['text', 'senderId', 'timestamp'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.timestamp == request.time
+          && isValidBody(request.resource.data.text)
+          && request.resource.data.get('reactions', {}) == {}
+          && request.resource.data.get('replyToId', '') is string
+          && request.resource.data.get('replyToId', '').size() <= 128
+          && request.resource.data.get('replyToText', '') is string
+          && request.resource.data.get('replyToText', '').size() <= 2000
+          && request.resource.data.get('replyToSender', '') is string
+          && request.resource.data.get('replyToSender', '').size() <= 128;
+        // Reactions: a participant may set or clear only their own emoji.
+        allow update: if isVerified()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+          && request.resource.data.reactions is map
+          && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys()
+               .hasOnly([request.auth.uid])
+          && (!(request.auth.uid in request.resource.data.reactions)
+              || (request.resource.data.reactions[request.auth.uid] is string
+                  && request.resource.data.reactions[request.auth.uid].size() > 0
+                  && request.resource.data.reactions[request.auth.uid].size() <= 16));
+        // Editing: only the sender may change the text, and only to a non-empty string (flagged edited).
+        allow update: if isVerified()
+          && resource.data.senderId == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'edited'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 8000
+          && request.resource.data.edited == true;
+        allow delete: if isVerified()
+          && resource.data.senderId == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+      }
+    }
+
+    // Public keys for E2EE key exchange: anyone signed in may read, only the owner may write.
+    match /publicKeys/{uid} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['publicKey', 'updatedAt'])
+        && request.resource.data.publicKey is string
+        && request.resource.data.publicKey.size() > 0
+        && request.resource.data.publicKey.size() <= 1000;
+      allow delete: if false;
+    }
+
+    // Deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

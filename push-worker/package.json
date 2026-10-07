@@ -1,0 +1,17 @@
+{
+  "name": "hush-push",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test test/*.test.ts",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261004.1",
+    "@types/node": "22.10.2",
+    "typescript": "5.6.3",
+    "wrangler": "4.147.0"
+  }
+}
