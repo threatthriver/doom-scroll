@@ -1,6 +1,5 @@
 package com.securemessage.app.ui.conversations
 
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,18 +22,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Unarchive
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -42,29 +42,38 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.securemessage.app.data.model.Chat
 import com.securemessage.app.ui.common.AppViewModelFactory
 import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.common.MonochromeSearchBar
+import com.securemessage.app.ui.common.NotificationsOffBanner
 import com.securemessage.app.ui.common.formatTime
 import com.securemessage.app.ui.theme.HairlineBorder
 import com.securemessage.app.ui.theme.ObsidianCard
 import com.securemessage.app.ui.theme.ObsidianCardHover
 import com.securemessage.app.ui.theme.ObsidianVoid
+import com.securemessage.app.ui.theme.SunsetAmber
+import com.securemessage.app.ui.theme.SunsetCoral
 import com.securemessage.app.ui.theme.TgAvatarNeutral
 import com.securemessage.app.ui.theme.TgBlue
 import com.securemessage.app.ui.theme.TextMuted
@@ -77,18 +86,36 @@ fun ConversationsScreen(
     onNewChat: () -> Unit,
     onOpenChat: (String) -> Unit,
     onNeedsProfile: () -> Unit,
+    onNeedsVerification: () -> Unit,
     onSignedOut: () -> Unit,
     modifier: Modifier = Modifier,
     vm: ConversationsViewModel = viewModel(factory = AppViewModelFactory.Factory),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
-    val context = LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(state.needsProfile) { if (state.needsProfile) onNeedsProfile() }
+    LaunchedEffect(state.needsVerification) { if (state.needsVerification) onNeedsVerification() }
 
-    var searchQuery by remember { mutableStateOf("") }
-    var showMenu by remember { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var showArchiveSheet by remember { mutableStateOf(false) }
+
+    // Archive / unarchive with an Undo action instead of a silent, irreversible long-press.
+    fun archiveWithUndo(chat: Chat, archiving: Boolean) {
+        val title = vm.titleFor(chat)
+        vm.toggleArchive(chat)
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val result = snackbar.showSnackbar(
+                message = if (archiving) "$title archived" else "$title moved to chats",
+                actionLabel = "Undo",
+                withDismissAction = true,
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) vm.toggleArchive(chat)
+        }
+    }
     val archiveSheetState = rememberModalBottomSheetState()
 
     // Archived chats live in their own vault, so they never appear in the main list.
@@ -102,7 +129,7 @@ fun ConversationsScreen(
             activeChats.filter { chat ->
                 val title = vm.titleFor(chat)
                 title.contains(searchQuery, ignoreCase = true) ||
-                    chat.lastMessage.contains(searchQuery, ignoreCase = true)
+                    previewText(chat.lastMessage, "").contains(searchQuery, ignoreCase = true)
             }
         }
     }
@@ -116,81 +143,22 @@ fun ConversationsScreen(
             modifier = Modifier
                 .fillMaxSize(),
         ) {
-            // Header: logo + title + overflow menu
+            // Header: logo + title
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(ObsidianCardHover),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Shield,
-                            contentDescription = "Verified Secure",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    Text(
-                        text = "Chat",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        letterSpacing = (-0.5).sp,
-                    )
-                }
-
-                Box {
-                    IconButton(onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        showMenu = true
-                    }) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Options",
-                            tint = TextPrimary,
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        modifier = Modifier.background(ObsidianCard),
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("New Group", color = TextPrimary) },
-                            onClick = {
-                                showMenu = false
-                                onNewChat()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Saved Messages", color = TextPrimary) },
-                            onClick = {
-                                showMenu = false
-                                Toast.makeText(context, "Saved Messages vault", Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Settings", color = TextPrimary) },
-                            onClick = {
-                                showMenu = false
-                                Toast.makeText(context, "Settings", Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                    }
-                }
+                com.securemessage.app.ui.common.HushOrb(size = 40.dp)
+                Text(
+                    text = "Chats",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    letterSpacing = (-0.5).sp,
+                )
             }
 
             MonochromeSearchBar(
@@ -201,6 +169,8 @@ fun ConversationsScreen(
             )
 
             Spacer(Modifier.height(6.dp))
+
+            NotificationsOffBanner(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
 
             Box(modifier = Modifier.weight(1f)) {
                 when {
@@ -217,41 +187,34 @@ fun ConversationsScreen(
                     // True "empty account" state only when nothing exists at all, including
                     // the archive vault. If chats are archived we still render the list so the
                     // vault row stays reachable.
+                    state.error != null && activeChats.isEmpty() && archivedChats.isEmpty() -> {
+                        EmptyStateMessage(
+                            icon = Icons.Filled.SearchOff,
+                            title = "Couldn't load your chats",
+                            body = state.error ?: "",
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
+
                     activeChats.isEmpty() && archivedChats.isEmpty() -> {
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(CircleShape)
-                                    .background(ObsidianCardHover),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Shield,
-                                    contentDescription = null,
-                                    tint = TgBlue,
-                                    modifier = Modifier.size(32.dp),
-                                )
-                            }
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                text = "No conversations yet",
-                                color = TextPrimary,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                text = "Tap the button below to start a secure chat.",
-                                color = TextSecondary,
-                                fontSize = 14.sp,
-                            )
-                        }
+                        EmptyStateMessage(
+                            icon = Icons.Filled.Shield,
+                            title = "No conversations yet",
+                            body = "Start a private chat with someone you know.",
+                            actionLabel = "Start a chat",
+                            onAction = onNewChat,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
+
+                    // Searching, but nothing matches: say so instead of showing a blank list.
+                    searchQuery.isNotBlank() && filteredChats.isEmpty() -> {
+                        EmptyStateMessage(
+                            icon = Icons.Filled.SearchOff,
+                            title = "No results",
+                            body = "No chats match \"${searchQuery.trim()}\".",
+                            modifier = Modifier.align(Alignment.Center),
+                        )
                     }
 
                     else -> {
@@ -260,12 +223,11 @@ fun ConversationsScreen(
                             contentPadding = PaddingValues(bottom = 140.dp),
                         ) {
                             // Telegram pinned row: Archived Chats — only when something is archived
-                            if (archivedChats.isNotEmpty()) {
+                            if (archivedChats.isNotEmpty() && searchQuery.isBlank()) {
                                 item(key = "archived_header") {
                                     ArchivedChatsItem(
                                         count = archivedChats.size,
-                                        preview = archivedChats.first().lastMessage
-                                            .ifEmpty { "Archived chats" },
+                                        preview = previewText(archivedChats.first().lastMessage, "Archived chats"),
                                         onClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             showArchiveSheet = true
@@ -286,12 +248,7 @@ fun ConversationsScreen(
                                     },
                                     onLongClick = {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        vm.toggleArchive(chat)
-                                        Toast.makeText(
-                                            context,
-                                            "${vm.titleFor(chat)} archived",
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
+                                        archiveWithUndo(chat, archiving = true)
                                     },
                                 )
                             }
@@ -301,51 +258,41 @@ fun ConversationsScreen(
             }
         }
 
-        // Telegram stacked FABs: quick camera + new message
-        Column(
+        // New chat button (56dp, above the floating dock) — warm sunset gradient with a soft glow.
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 104.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(end = 16.dp, bottom = 104.dp)
+                .size(56.dp)
+                .shadow(
+                    elevation = 14.dp,
+                    shape = CircleShape,
+                    clip = false,
+                    spotColor = SunsetCoral,
+                    ambientColor = SunsetCoral,
+                )
+                .clip(CircleShape)
+                .background(Brush.linearGradient(listOf(SunsetCoral, SunsetAmber)))
+                .clickable(role = Role.Button, onClickLabel = "Start a new chat") {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onNewChat()
+                },
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "Camera capture", Toast.LENGTH_SHORT).show()
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.CameraAlt,
-                    contentDescription = "Quick Camera",
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(TgBlue)
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onNewChat()
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "New Message",
-                    tint = Color.White,
-                    modifier = Modifier.size(30.dp),
-                )
-            }
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = "New chat",
+                tint = Color.White,
+                modifier = Modifier.size(30.dp),
+            )
         }
+
+        SnackbarHost(
+            hostState = snackbar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp),
+        )
 
         // Archived Chats Vault — only reachable when at least one chat is archived.
         if (showArchiveSheet && archivedChats.isNotEmpty()) {
@@ -373,10 +320,77 @@ fun ConversationsScreen(
                     },
                     onUnarchive = { chat ->
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        vm.toggleArchive(chat)
-                        Toast.makeText(context, "${vm.titleFor(chat)} unarchived", Toast.LENGTH_SHORT).show()
+                        archiveWithUndo(chat, archiving = false)
                     },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Chat previews are stored as sent, which for encrypted chats is base64 ciphertext. Showing that
+ * would look like garbage, so it is replaced by a short label. (Decrypting previews would need each
+ * chat's key loaded for the whole list.)
+ */
+internal fun previewText(lastMessage: String, empty: String): String = when {
+    lastMessage.isEmpty() -> empty
+    com.securemessage.app.data.crypto.E2EEncryption.looksEncrypted(lastMessage) -> "Encrypted message"
+    else -> lastMessage
+}
+
+/** Centered icon + title + body, with an optional call-to-action button. */
+@Composable
+internal fun EmptyStateMessage(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(ObsidianCardHover),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TgBlue,
+                modifier = Modifier.size(32.dp),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = title,
+            color = TextPrimary,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = body,
+            color = TextSecondary,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+        )
+        if (actionLabel != null) {
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = onAction,
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = TgBlue, contentColor = Color.White),
+                modifier = Modifier.height(44.dp),
+            ) {
+                Text(text = actionLabel, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             }
         }
     }
@@ -474,26 +488,15 @@ private fun ConversationRowItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                Text(
+                    text = title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
-                ) {
-                    Text(
-                        text = title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = "Verified",
-                        tint = TgBlue,
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
+                )
                 Spacer(Modifier.size(8.dp))
                 Text(
                     text = formatTime(chat.lastMessageAt).uppercase(),
@@ -508,7 +511,7 @@ private fun ConversationRowItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = chat.lastMessage.ifEmpty { "No messages yet" },
+                    text = previewText(chat.lastMessage, "No messages yet"),
                     fontSize = 14.sp,
                     color = TextSecondary,
                     maxLines = 1,
@@ -573,7 +576,7 @@ private fun ArchivedChatsSheet(
             items(chats, key = { it.id }) { chat ->
                 ArchivedChatRow(
                     title = vm.titleFor(chat),
-                    subtitle = chat.lastMessage.ifEmpty { "No messages yet" },
+                    subtitle = previewText(chat.lastMessage, "No messages yet"),
                     time = formatTime(chat.lastMessageAt),
                     onClick = { onOpenChat(chat.id) },
                     onUnarchive = { onUnarchive(chat) },

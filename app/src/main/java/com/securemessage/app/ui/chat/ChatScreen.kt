@@ -30,7 +30,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,35 +41,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -83,7 +73,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -120,7 +113,9 @@ import com.securemessage.app.ui.theme.PureWhite
 import com.securemessage.app.ui.theme.TgBlue
 import com.securemessage.app.ui.theme.TgBubbleIn
 import com.securemessage.app.ui.theme.TgBubbleInTime
-import com.securemessage.app.ui.theme.TgBubbleOut
+import com.securemessage.app.ui.theme.SunsetAmber
+import com.securemessage.app.ui.theme.SunsetCoral
+import com.securemessage.app.ui.theme.SunsetPink
 import com.securemessage.app.ui.theme.TgBubbleOutTime
 import com.securemessage.app.ui.theme.TgWallpaperBase
 import com.securemessage.app.ui.theme.TextMuted
@@ -145,23 +140,30 @@ fun ChatScreen(
     var showHeaderMenu by remember { mutableStateOf(false) }
     var selectedMessageForMenu by remember { mutableStateOf<Message?>(null) }
     var replyingToMessage by remember { mutableStateOf<Message?>(null) }
-    var showAttachmentSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    var showSecurityCode by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<Message?>(null) }
+    // null = search closed. Search runs on the decrypted messages already loaded on the phone.
+    var searchQuery by remember { mutableStateOf<String?>(null) }
 
-    val isScrolledUp by remember {
-        derivedStateOf { listState.canScrollForward }
+    // The list is drawn bottom-up (reverseLayout): index 0 is the NEWEST message. The chat opens
+    // on the newest messages with no scrolling at all, and older pages loaded at the top never
+    // move what you are looking at.
+    val visibleMessages = remember(state.messages, searchQuery) {
+        val q = searchQuery?.trim().orEmpty()
+        if (q.isEmpty()) state.messages
+        else state.messages.filter { !isLockedPlaceholder(it.text) && it.text.contains(q, ignoreCase = true) }
     }
+    val rows = remember(visibleMessages) { buildChatRows(visibleMessages) }
 
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) {
-            // Don't yank the user away from history: only follow new messages when
-            // already pinned near the bottom.
-            val layout = listState.layoutInfo
-            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
-            val nearBottom = lastVisible == -1 || lastVisible >= state.messages.lastIndex - 3
-            if (nearBottom) {
-                listState.animateScrollToItem(state.messages.lastIndex)
-            }
+    // "Scroll to newest" button: shown whenever the view is not at the bottom.
+    val isScrolledUp by remember { derivedStateOf { listState.canScrollBackward } }
+
+    // Follow new messages only if you are already at (or next to) the bottom, or you sent it.
+    val newestId = rows.firstOrNull()?.message?.id
+    val newestIsMine = rows.firstOrNull()?.message?.senderId == myUid
+    LaunchedEffect(newestId) {
+        if (newestId != null && (newestIsMine || listState.firstVisibleItemIndex <= 1)) {
+            listState.animateScrollToItem(0)
         }
     }
     LaunchedEffect(state.userMessage) {
@@ -170,10 +172,15 @@ fun ChatScreen(
             vm.userMessageShown()
         }
     }
-    LaunchedEffect(listState.firstVisibleItemIndex) {
-        if (listState.firstVisibleItemIndex <= 2 && !state.isLoadingMore && state.hasMoreMessages) {
-            vm.loadMoreMessages()
+    // Load older messages when the top of the history (the END of the list) comes into view.
+    val nearOldest by remember {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            last >= 0 && last >= listState.layoutInfo.totalItemsCount - 4
         }
+    }
+    LaunchedEffect(nearOldest, state.messages.size) {
+        if (nearOldest && !state.isLoadingMore && state.hasMoreMessages) vm.loadMoreMessages()
     }
 
     // Presence for the tray notifier: no buzz for the chat on screen, and opening
@@ -197,7 +204,9 @@ fun ChatScreen(
             .statusBarsPadding()
             .navigationBarsPadding(),
     ) {
-        TelegramWallpaper(modifier = Modifier.fillMaxSize())
+        // Own graphics layer: the pattern is painted once and reused while the list scrolls,
+        // instead of being redrawn whenever something above it changes.
+        TelegramWallpaper(modifier = Modifier.fillMaxSize().graphicsLayer())
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -256,9 +265,13 @@ fun ChatScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = if (state.isEncrypted) "Secure chat" else "Not encrypted",
+                            text = when {
+                                state.otherTyping -> "typing…"
+                                state.isEncrypted -> "Secure chat"
+                                else -> "Waiting for secure connection"
+                            },
                             fontSize = 12.sp,
-                            color = if (state.isEncrypted) TgLink else TgErrorRed,
+                            color = if (state.otherTyping || state.isEncrypted) TgLink else TextSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -286,19 +299,99 @@ fun ChatScreen(
                         modifier = Modifier.background(ObsidianCard),
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Check security code", color = TextPrimary) },
+                            text = { Text("Search messages", color = TextPrimary) },
                             onClick = {
                                 showHeaderMenu = false
-                                Toast.makeText(context, "Security code: ${state.encryptionFingerprint}", Toast.LENGTH_LONG).show()
+                                searchQuery = ""
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Clear History", color = TextPrimary) },
+                            text = { Text("Check security code", color = TextPrimary) },
                             onClick = {
                                 showHeaderMenu = false
-                                Toast.makeText(context, "History cleared", Toast.LENGTH_SHORT).show()
+                                showSecurityCode = true
                             },
                         )
+                    }
+                }
+            }
+
+            // In-chat search (matches decrypted text of the messages loaded on this phone).
+            searchQuery?.let { query ->
+                val focusRequester = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focusRequester.requestFocus() }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(DockGlassBackground)
+                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                        .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) Text("Search in chat", fontSize = 15.sp, color = TextMuted)
+                        BasicTextField(
+                            value = query,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            textStyle = TextStyle(color = TextPrimary, fontSize = 15.sp),
+                            cursorBrush = SolidColor(TgBlue),
+                            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                        )
+                    }
+                    if (query.isNotBlank()) {
+                        Text(
+                            text = "${visibleMessages.size} found",
+                            fontSize = 12.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                        )
+                    }
+                    IconButton(onClick = { searchQuery = null }) {
+                        Icon(Icons.Filled.Close, contentDescription = "Close search", tint = TextPrimary)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+
+            // The other person's key changed (new phone or reinstall, or tampering): say so.
+            if (state.safetyNumberChanged) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(ObsidianCard)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = TgErrorRed,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Security code changed",
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "${state.title} may have a new phone. Compare the code with them.",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    TextButton(onClick = { showSecurityCode = true }) {
+                        Text("View", color = TgBlue, fontWeight = FontWeight.SemiBold)
+                    }
+                    TextButton(onClick = vm::acknowledgeSafetyNumber) {
+                        Text("OK", color = TextSecondary)
                     }
                 }
             }
@@ -308,9 +401,78 @@ fun ChatScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
+                    reverseLayout = true,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    // Newest first: with reverseLayout the first item sits at the bottom.
+                    items(rows, key = { it.message.id }) { row ->
+                        val msg = row.message
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            // One divider per calendar day, above its first message.
+                            row.dayLabel?.let { TelegramDateChip(label = it) }
+
+                            TelegramMessageBubble(
+                                message = msg,
+                                isMine = msg.senderId == myUid,
+                                userReaction = msg.reactions[myUid],
+                                reactionCount = msg.reactions.size,
+                                replySenderName = if (msg.replyToSender == myUid) "You" else state.title,
+                                onTap = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedMessageForMenu = msg
+                                },
+                                onLongPress = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    selectedMessageForMenu = msg
+                                },
+                            )
+                        }
+                    }
+
+                    if (state.messages.isEmpty() && !state.isLoadingMore) {
+                        item(key = "empty_hint") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 48.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = null,
+                                        tint = TgLink,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                    Text(
+                                        text = "No messages yet",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White,
+                                    )
+                                    Text(
+                                        text = "Say hello. Messages in this chat are end-to-end encrypted.",
+                                        fontSize = 13.sp,
+                                        color = Color.White.copy(alpha = 0.8f),
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     if (state.isLoadingMore) {
                         item {
                             Box(
@@ -328,42 +490,6 @@ fun ChatScreen(
                         }
                     }
 
-                    itemsIndexed(state.messages, key = { _, m -> m.id }) { index, msg ->
-                        val isMine = msg.senderId == myUid
-                        val userReaction = msg.reactions[myUid]
-                        val reactionCount = msg.reactions.size
-                        val previous = state.messages.getOrNull(index - 1)
-                        val startsNewDay = previous == null ||
-                            !isSameDay(previous.timestamp, msg.timestamp)
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateItem(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            // One divider per calendar day, instead of a single hard-coded "TODAY"
-                            if (startsNewDay) {
-                                TelegramDateChip(label = formatDayLabel(msg.timestamp))
-                            }
-
-                            TelegramMessageBubble(
-                                message = msg,
-                                isMine = isMine,
-                                userReaction = userReaction,
-                                reactionCount = reactionCount,
-                                replySenderName = if (msg.replyToSender == myUid) "You" else state.title,
-                                onTap = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    selectedMessageForMenu = msg
-                                },
-                                onLongPress = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    selectedMessageForMenu = msg
-                                },
-                            )
-                        }
-                    }
                 }
 
                 if (isScrolledUp) {
@@ -377,7 +503,7 @@ fun ChatScreen(
                             .border(1.dp, HairlineBorder, CircleShape)
                             .clickable {
                                 coroutineScope.launch {
-                                    listState.animateScrollToItem(state.messages.lastIndex)
+                                    listState.animateScrollToItem(0)
                                 }
                             },
                         contentAlignment = Alignment.Center,
@@ -388,6 +514,23 @@ fun ChatScreen(
                             tint = PureWhite,
                             modifier = Modifier.size(20.dp),
                         )
+                    }
+                }
+            }
+
+            // Edit banner: the composer below holds the text being changed.
+            state.editing?.let {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(ObsidianCard)
+                        .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("Editing message", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TgBlue)
+                    IconButton(onClick = vm::cancelEdit, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Filled.Close, contentDescription = "Cancel edit", tint = TextMuted, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -474,25 +617,10 @@ fun ChatScreen(
                             .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                Toast.makeText(context, "Emoji picker coming soon", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.size(36.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.SentimentSatisfiedAlt,
-                                contentDescription = "Emoji",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(22.dp),
-                            )
-                        }
-
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 6.dp),
+                                .padding(horizontal = 12.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             if (state.draft.isEmpty()) {
@@ -521,51 +649,32 @@ fun ChatScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-
-                        IconButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                showAttachmentSheet = true
-                            },
-                            modifier = Modifier.size(36.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.AttachFile,
-                                contentDescription = "Attach",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(22.dp),
-                            )
-                        }
                     }
 
+                    // Send button: dimmed and inactive until there is something to send.
+                    val canSend = state.draft.isNotBlank()
                     Box(
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
-                            .background(TgBlue)
-                            .clickable {
-                                if (state.draft.isNotBlank()) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    vm.send(replyingToMessage)
-                                    replyingToMessage = null
-                                } else {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    Toast.makeText(context, "Voice notes coming soon", Toast.LENGTH_SHORT).show()
-                                }
+                            .background(if (canSend) TgBlue else TgBlue.copy(alpha = 0.4f))
+                            .clickable(
+                                enabled = canSend,
+                                role = androidx.compose.ui.semantics.Role.Button,
+                                onClickLabel = "Send message",
+                            ) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                vm.send(replyingToMessage)
+                                replyingToMessage = null
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        AnimatedContent(
-                            targetState = state.draft.isNotBlank(),
-                            label = "send_mic_swap",
-                        ) { hasText ->
-                            Icon(
-                                imageVector = if (hasText) Icons.AutoMirrored.Filled.Send else Icons.Filled.Mic,
-                                contentDescription = if (hasText) "Send" else "Record Audio",
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp),
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
                 }
             }
@@ -590,6 +699,15 @@ fun ChatScreen(
                     replyingToMessage = selectedMsg
                     selectedMessageForMenu = null
                 },
+                onEdit = if (selectedMsg.senderId == myUid && !isLockedPlaceholder(selectedMsg.text)) {
+                    {
+                        replyingToMessage = null
+                        vm.startEdit(selectedMsg)
+                        selectedMessageForMenu = null
+                    }
+                } else {
+                    null
+                },
                 onCopy = {
                     val clip = ClipData.newPlainText("Message", selectedMsg.text)
                     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -598,38 +716,79 @@ fun ChatScreen(
                     Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                     selectedMessageForMenu = null
                 },
-                onDelete = {
-                    vm.deleteMessage(selectedMsg)
-                    selectedMessageForMenu = null
+                // Only your own messages can be deleted (for everyone), so only offer it there.
+                onDelete = if (selectedMsg.senderId == myUid) {
+                    {
+                        pendingDelete = selectedMsg
+                        selectedMessageForMenu = null
+                    }
+                } else {
+                    null
                 },
             )
         }
 
-        // Attachment Bottom Sheet
-        if (showAttachmentSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showAttachmentSheet = false },
-                sheetState = sheetState,
+        pendingDelete?.let { target ->
+            AlertDialog(
+                onDismissRequest = { pendingDelete = null },
                 containerColor = ObsidianCard,
-                contentColor = PureWhite,
-                dragHandle = {
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 10.dp, bottom = 14.dp)
-                            .size(width = 38.dp, height = 4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(HairlineBorder),
+                shape = RoundedCornerShape(20.dp),
+                title = { Text("Delete message?", fontWeight = FontWeight.SemiBold, color = TextPrimary) },
+                text = {
+                    Text(
+                        text = "This removes the message for everyone in this chat.",
+                        color = TextSecondary,
+                        fontSize = 14.sp,
                     )
                 },
-            ) {
-                TelegramAttachmentSheetContent(
-                    onActionSelected = { action ->
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        Toast.makeText(context, "$action coming soon", Toast.LENGTH_SHORT).show()
-                        showAttachmentSheet = false
-                    },
-                )
-            }
+                confirmButton = {
+                    TextButton(onClick = {
+                        vm.deleteMessage(target)
+                        pendingDelete = null
+                    }) { Text("Delete", color = TgErrorRed, fontWeight = FontWeight.SemiBold) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDelete = null }) { Text("Cancel", color = TextSecondary) }
+                },
+            )
+        }
+
+        if (showSecurityCode) {
+            val code = state.encryptionFingerprint
+            AlertDialog(
+                onDismissRequest = { showSecurityCode = false },
+                containerColor = ObsidianCard,
+                shape = RoundedCornerShape(20.dp),
+                title = { Text("Security code", fontWeight = FontWeight.SemiBold, color = TextPrimary) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = if (code.isNotBlank()) code.chunked(4).joinToString(" ") else "Not available for this chat.",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp,
+                            color = TextPrimary,
+                        )
+                        Text(
+                            text = "Compare this code with ${state.title} in person or on a call. If it matches on both phones, your messages are private.",
+                            fontSize = 13.sp,
+                            color = TextSecondary,
+                        )
+                    }
+                },
+                confirmButton = {
+                    if (code.isNotBlank()) {
+                        TextButton(onClick = {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText("Security code", code))
+                            showSecurityCode = false
+                            coroutineScope.launch { snackbar.showSnackbar("Security code copied") }
+                        }) { Text("Copy", color = TgBlue, fontWeight = FontWeight.SemiBold) }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSecurityCode = false }) { Text("Close", color = TextSecondary) }
+                },
+            )
         }
     }
 }
@@ -646,18 +805,21 @@ private fun TelegramMessageBubble(
     onLongPress: () -> Unit,
 ) {
     val bubbleShape = if (isMine) {
-        RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
+        RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
     } else {
-        RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
+        RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)
     }
 
-    // Telegram bubbles: outgoing blue->violet gradient, incoming dark slate, white text on both
-    val bubbleBrush = if (isMine) {
-        Brush.horizontalGradient(listOf(TgBubbleOut, Color(0xFF4F8DEB)))
-    } else {
-        Brush.horizontalGradient(listOf(TgBubbleIn, TgBubbleIn))
+    // Warm Sunset bubbles: outgoing rides the coral -> amber -> pink sunset ramp on a soft
+    // diagonal, incoming is a cozy warm surface. White text reads cleanly on both.
+    val bubbleBrush = remember(isMine) {
+        if (isMine) {
+            Brush.linearGradient(listOf(SunsetCoral, SunsetAmber, SunsetPink))
+        } else {
+            Brush.linearGradient(listOf(TgBubbleIn, TgBubbleIn))
+        }
     }
-    val textColor = Color.White
+    val textColor = if (isMine) Color.White else TextPrimary
     val metaColor = if (isMine) TgBubbleOutTime else TgBubbleInTime
 
     Column(
@@ -710,9 +872,12 @@ private fun TelegramMessageBubble(
             Row(
                 verticalAlignment = Alignment.Bottom,
             ) {
+            val locked = isLockedPlaceholder(message.text)
             Text(
                 text = message.text,
-                color = textColor,
+                // A message we can't show is styled as a note, not as something the person wrote.
+                color = if (locked) textColor.copy(alpha = 0.7f) else textColor,
+                fontStyle = if (locked) androidx.compose.ui.text.font.FontStyle.Italic else null,
                 fontSize = 16.sp,
                 lineHeight = 21.sp,
                 modifier = Modifier.weight(1f, fill = false),
@@ -724,14 +889,16 @@ private fun TelegramMessageBubble(
                 modifier = Modifier.padding(bottom = 2.dp),
             ) {
                 Text(
-                    text = formatTime(message.timestamp),
+                    text = if (message.edited) "edited  ${formatTime(message.timestamp)}" else formatTime(message.timestamp),
                     color = metaColor,
                     fontSize = 11.sp,
                 )
                 if (isMine) {
+                    // The data model has no read receipts, so show a single "sent" tick
+                    // instead of the double tick that implied the message was read.
                     Icon(
-                        imageVector = Icons.Filled.DoneAll,
-                        contentDescription = "Read",
+                        imageVector = Icons.Filled.Done,
+                        contentDescription = "Sent",
                         tint = metaColor,
                         modifier = Modifier.size(14.dp),
                     )
@@ -775,9 +942,10 @@ private fun TelegramMessageActionDialog(
     onReact: (String) -> Unit,
     onReply: () -> Unit,
     onCopy: () -> Unit,
-    onDelete: () -> Unit,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)?,
 ) {
-    val reactions = listOf("🖤", "🔥", "⚡", "👍", "👎", "💀", "🔒")
+    val reactions = listOf("👍", "❤️", "🔥", "😂", "😮", "😢", "👎")
 
     Box(
         modifier = Modifier
@@ -824,8 +992,14 @@ private fun TelegramMessageActionDialog(
                     TelegramMenuRow(Icons.AutoMirrored.Filled.Reply, "Reply", onReply)
                     Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
                     TelegramMenuRow(Icons.Filled.ContentCopy, "Copy", onCopy)
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
-                    TelegramMenuRow(Icons.Filled.Delete, "Delete", onDelete)
+                    if (onEdit != null) {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                        TelegramMenuRow(Icons.Filled.Edit, "Edit", onEdit)
+                    }
+                    if (onDelete != null) {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(HairlineBorderSubtle))
+                        TelegramMenuRow(Icons.Filled.Delete, "Delete", onDelete, tint = TgErrorRed)
+                    }
                 }
             }
         }
@@ -837,10 +1011,12 @@ private fun TelegramMenuRow(
     icon: ImageVector,
     title: String,
     onClick: () -> Unit,
+    tint: Color = PureWhite,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -848,135 +1024,18 @@ private fun TelegramMenuRow(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = title,
-            tint = PureWhite,
-            modifier = Modifier.size(18.dp),
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(20.dp),
         )
         Text(
             text = title,
-            fontSize = 14.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
-            color = PureWhite,
+            color = tint,
         )
     }
 }
-
-@Composable
-private fun TelegramAttachmentSheetContent(
-    onActionSelected: (String) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(ObsidianVoid)
-                .border(1.dp, HairlineBorder, RoundedCornerShape(14.dp))
-                .clickable { onActionSelected("Open Camera") }
-                .padding(14.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(PureWhite),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CameraAlt,
-                        contentDescription = "Camera",
-                        tint = PureBlack,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Open Camera",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PureWhite,
-                    )
-                    Text(
-                        text = "Take a photo or record video",
-                        fontSize = 11.sp,
-                        color = TextMuted,
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        val options = listOf(
-            Triple(Icons.Filled.PhotoLibrary, "Gallery", "Photos & Videos"),
-            Triple(Icons.Filled.InsertDriveFile, "File", "Documents up to 2GB"),
-            Triple(Icons.Filled.LocationOn, "Location", "Share live coordinates"),
-            Triple(Icons.Filled.MusicNote, "Audio", "Music and voice notes"),
-            Triple(Icons.Filled.BarChart, "Poll", "Create a poll"),
-            Triple(Icons.Filled.Person, "Contact", "Share vCard contact"),
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            options.chunked(2).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    rowItems.forEach { (icon, title, subtitle) ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(ObsidianVoid)
-                                .border(1.dp, HairlineBorder, RoundedCornerShape(12.dp))
-                                .clickable { onActionSelected(title) }
-                                .padding(12.dp),
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = title,
-                                    tint = PureWhite,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                                Column {
-                                    Text(
-                                        text = title,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PureWhite,
-                                    )
-                                    Text(
-                                        text = subtitle,
-                                        fontSize = 10.sp,
-                                        color = TextMuted,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(28.dp))
-    }
-}
-
 
 /** Centered day divider pill ("Today", "Yesterday", "October 1") like Telegram's. */
 @Composable
@@ -990,14 +1049,14 @@ private fun TelegramDateChip(label: String) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black.copy(alpha = 0.28f))
+                .background(ObsidianCard.copy(alpha = 0.72f))
                 .padding(horizontal = 14.dp, vertical = 5.dp),
         ) {
             Text(
                 text = label,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White,
+                color = TextPrimary,
             )
         }
     }

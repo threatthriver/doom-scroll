@@ -1,26 +1,31 @@
 package com.securemessage.app.ui.common
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,18 +44,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.securemessage.app.ui.theme.DockGlassBackground
 import com.securemessage.app.ui.theme.DockPillActive
 import com.securemessage.app.ui.theme.DockPillInactiveText
 import com.securemessage.app.ui.theme.ObsidianVoid
@@ -58,7 +66,7 @@ import com.securemessage.app.ui.theme.TgBlue
 
 /**
  * [icon] is the outlined glyph shown while a tab is idle, [selectedIcon] the filled glyph
- * shown while it is active (Telegram swaps outline -> filled on selection).
+ * shown while it is active.
  */
 enum class NavTab(
     val title: String,
@@ -71,16 +79,23 @@ enum class NavTab(
     PROFILE("Profile", Icons.Filled.Person, Icons.Filled.Person),
 }
 
-private val DockHeight = 46.dp
+private val DockShape = RoundedCornerShape(32.dp)
+private val ItemShape = RoundedCornerShape(26.dp)
+private val ItemHeight = 52.dp
+
+/** How much wider the selected tab is than an idle one. The tabs animate their widths, so the
+ *  highlight appears to flow from one tab to the next. */
+private const val SELECTED_WEIGHT = 2.2f
 
 /**
- * Floating glass dock.
+ * Floating dock.
  *
- * - A soft fade sits behind the dock so page content never looks cut off underneath it.
- * - One highlight pill slides (with a little spring) to the tab you tap, instead of each
- *   tab drawing its own pill.
- * - The active icon pops slightly, idle tabs are outlined, active tabs are filled.
- * - The Profile tab shows your own avatar.
+ * - The selected tab grows to show its name next to its icon; the others shrink to icons. All
+ *   widths are animated with one spring, so switching tabs reads as a single smooth motion.
+ * - Tabs press in slightly under the finger and spring back.
+ * - Idle icons are outlined, the active one is filled and tinted.
+ * - Unread messages show as a pill badge on Chats; Profile shows your own avatar.
+ * - Each tab reports itself as a selectable tab to screen readers.
  */
 @Composable
 fun DynamicFloatingNavBar(
@@ -90,157 +105,209 @@ fun DynamicFloatingNavBar(
     badgeCount: Int = 0,
     profileInitials: String = "",
 ) {
-    val dockShape = RoundedCornerShape(26.dp)
     val tabs = NavTab.entries
+    val haptic = LocalHapticFeedback.current
+    val dockBrush = remember {
+        Brush.verticalGradient(listOf(Color(0xF53A2C28), Color(0xF5241B19)))
+    }
+    val borderBrush = remember {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.03f)))
+    }
+    val fadeBrush = remember {
+        Brush.verticalGradient(listOf(Color.Transparent, ObsidianVoid.copy(alpha = 0.94f)))
+    }
 
+    // A soft fade behind the dock so page content never looks cut off underneath it.
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, ObsidianVoid.copy(alpha = 0.92f)),
-                ),
-            )
-            .padding(start = 28.dp, end = 28.dp, top = 14.dp, bottom = 8.dp),
+            .background(fadeBrush)
+            .padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 10.dp),
     ) {
-        BoxWithConstraints(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(elevation = 12.dp, shape = dockShape, clip = false)
-                .clip(dockShape)
-                .background(DockGlassBackground)
-                .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)), dockShape)
-                .padding(4.dp),
+                .shadow(
+                    elevation = 18.dp,
+                    shape = DockShape,
+                    clip = false,
+                    ambientColor = Color.Black,
+                    spotColor = TgBlue.copy(alpha = 0.6f),
+                )
+                .clip(DockShape)
+                .background(dockBrush)
+                .border(1.dp, borderBrush, DockShape)
+                .padding(6.dp)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            val tabWidth = maxWidth / tabs.size
-            val indicatorX by animateDpAsState(
-                targetValue = tabWidth * selectedTab.ordinal,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-                label = "dock_indicator",
-            )
-
-            // The single sliding highlight pill
-            Box(
-                modifier = Modifier
-                    .offset(x = indicatorX)
-                    .width(tabWidth)
-                    .height(DockHeight)
-                    .padding(horizontal = 3.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(DockPillActive),
-            )
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                tabs.forEach { tab ->
-                    NavBarItem(
-                        tab = tab,
-                        isSelected = tab == selectedTab,
-                        onClick = { onTabSelected(tab) },
-                        badgeCount = if (tab == NavTab.CHATS) badgeCount else 0,
-                        profileInitials = profileInitials,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+            tabs.forEach { tab ->
+                NavSlot(
+                    tab = tab,
+                    selected = tab == selectedTab,
+                    badgeCount = if (tab == NavTab.CHATS) badgeCount else 0,
+                    profileInitials = profileInitials,
+                    onClick = {
+                        if (tab != selectedTab) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTabSelected(tab)
+                    },
+                )
             }
         }
     }
 }
 
+/** One tab's share of the dock. Its width is animated, so the dock reshapes smoothly. */
 @Composable
-private fun NavBarItem(
+private fun RowScope.NavSlot(
     tab: NavTab,
-    isSelected: Boolean,
-    onClick: () -> Unit,
+    selected: Boolean,
     badgeCount: Int,
     profileInitials: String,
+    onClick: () -> Unit,
+) {
+    val weight by animateFloatAsState(
+        targetValue = if (selected) SELECTED_WEIGHT else 1f,
+        animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessMediumLow),
+        label = "nav_weight",
+    )
+    NavItem(
+        tab = tab,
+        selected = selected,
+        badgeCount = badgeCount,
+        profileInitials = profileInitials,
+        onClick = onClick,
+        modifier = Modifier.weight(weight.coerceAtLeast(0.1f)),
+    )
+}
+
+@Composable
+private fun NavItem(
+    tab: NavTab,
+    selected: Boolean,
+    badgeCount: Int,
+    profileInitials: String,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val haptic = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
 
-    val iconScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.12f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "tab_icon_scale",
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.92f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "nav_press",
+    )
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(durationMillis = 240),
+        label = "nav_pill",
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isSelected) TgBlue else DockPillInactiveText,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "tab_content",
+        targetValue = if (selected) TgBlue else DockPillInactiveText,
+        animationSpec = tween(durationMillis = 200),
+        label = "nav_content",
     )
 
-    Column(
+    val description = buildString {
+        append(tab.title)
+        if (badgeCount > 0) append(", $badgeCount unread")
+    }
+
+    Row(
         modifier = modifier
-            .height(DockHeight)
-            .clickable(
-                interactionSource = interactionSource,
+            .height(ItemHeight)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .clip(ItemShape)
+            .background(DockPillActive.copy(alpha = pillAlpha))
+            .selectable(
+                selected = selected,
+                interactionSource = interaction,
                 indication = null,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onClick()
-                },
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = description }
+            .padding(horizontal = 6.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(26.dp)
-                .scale(iconScale),
-        ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(28.dp)) {
             if (tab == NavTab.PROFILE && profileInitials.isNotBlank()) {
                 Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(26.dp)
                         .clip(CircleShape)
-                        .then(
-                            if (isSelected) Modifier.border(2.dp, TgBlue, CircleShape) else Modifier,
-                        ),
+                        .then(if (selected) Modifier.border(2.dp, TgBlue, CircleShape) else Modifier),
                     contentAlignment = Alignment.Center,
                 ) {
-                    MonochromeAvatar(initials = profileInitials, size = 20.dp)
+                    MonochromeAvatar(initials = profileInitials, size = 21.dp)
                 }
             } else {
                 Icon(
-                    imageVector = if (isSelected) tab.selectedIcon else tab.icon,
-                    contentDescription = tab.title,
+                    imageVector = if (selected) tab.selectedIcon else tab.icon,
+                    contentDescription = null,
                     tint = contentColor,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(24.dp),
                 )
             }
-            if (badgeCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 9.dp, y = (-5).dp)
-                        .size(15.dp)
-                        .clip(CircleShape)
-                        .background(TgBlue),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = if (badgeCount > 99) "99+" else badgeCount.toString(),
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
+            UnreadBadge(count = badgeCount, modifier = Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-6).dp))
         }
-        if (isSelected) {
-            Spacer(Modifier.height(2.dp))
+
+        AnimatedVisibility(
+            visible = selected,
+            enter = fadeIn(tween(220, delayMillis = 60)) + expandHorizontally(tween(260), expandFrom = Alignment.Start),
+            exit = fadeOut(tween(120)) + shrinkHorizontally(tween(220), shrinkTowards = Alignment.Start),
+        ) {
             Text(
                 text = tab.title,
                 color = contentColor,
-                fontSize = 9.5f.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
+                overflow = TextOverflow.Clip,
+                // The row already announces the tab's name; don't read the label twice.
+                modifier = Modifier
+                    .padding(start = 7.dp)
+                    .clearAndSetSemantics { },
             )
         }
+    }
+}
+
+/** Pill-shaped unread count that pops in when the first unread message arrives. */
+@Composable
+private fun UnreadBadge(count: Int, modifier: Modifier = Modifier) {
+    val scale by animateFloatAsState(
+        targetValue = if (count > 0) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "badge_scale",
+    )
+    if (scale <= 0.01f) return
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .widthIn(min = 17.dp)
+            .height(17.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(Color(0xFFFF5A4D))
+            .border(1.5.dp, Color(0xFF241B19), RoundedCornerShape(9.dp))
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (count > 99) "99+" else count.toString(),
+            color = Color.White,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
     }
 }

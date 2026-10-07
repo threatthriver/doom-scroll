@@ -2,62 +2,116 @@ package com.securemessage.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Telegram Dark palette — values sampled directly from org.telegram.messenger
-// on the reference device (1080x2392).
+// ---------------------------------------------------------------------------
+// "Warm Sunset" palette — friendly, cozy, human.
+//
+// Two moods share one language: a cream / peach LIGHT mode and a warm charcoal
+// DARK mode, both lit by a coral -> amber -> pink sunset accent.
+//
+// The top-level tokens below (TextPrimary, ObsidianVoid, TgBlue, ...) keep their
+// historical NAMES so every screen that already references them keeps compiling.
+// Their VALUES now resolve to the dark-mode warm palette, which is the app's
+// default mood. Light-mode equivalents live in the `Warm*` tokens and are wired
+// up through MaterialTheme in Theme.kt.
+// ---------------------------------------------------------------------------
 
 val PureWhite = Color(0xFFFFFFFF)
 val PureBlack = Color(0xFF000000)
 
-// Window / page backgrounds
-val ObsidianVoid = Color(0xFF1D2733)
-val ObsidianSurface = Color(0xFF17212B)
-val ObsidianSurfaceElevated = Color(0xFF212F3D)
-val ObsidianCard = Color(0xFF1D2733)
-val ObsidianCardHover = Color(0xFF2C3541)
+// --- Sunset accent ramp (shared by both moods) ----------------------------
+// Coral -> amber -> pink. These are the heart of the brand.
+val SunsetCoral = Color(0xFFFF6F61)   // warm red-coral
+val SunsetAmber = Color(0xFFFFB24C)   // golden amber
+val SunsetPink = Color(0xFFFF8FA3)    // soft rose-pink
+val SunsetPeach = Color(0xFFFFD2A6)   // pale peach highlight
+val SunsetDeep = Color(0xFFE2574C)    // pressed / deep coral
+val SunsetGlow = Color(0xFFFFC98A)    // warm glow for shadows & rings
 
-// Hairline structural dividers and borders
-val HairlineBorder = Color(0xFF2C3541)
-val HairlineBorderSubtle = Color(0xFF212F3D)
-val HairlineBorderBright = Color(0xFF384B5A)
+// =========================================================================
+// DARK MOOD — "warm charcoal at dusk" (the default; drives the legacy tokens)
+// =========================================================================
 
-// Typography & iconography
-val TextPrimary = Color(0xFFFFFFFF)
-val TextSecondary = Color(0xFF7D92A3)
-val TextMuted = Color(0xFF6A7983)
-val TextDark = Color(0xFF000000)
+// Window / page backgrounds — warm charcoal, never cold grey.
+val ObsidianVoid = Color(0xFF1A1413)           // page background (warm near-black)
+val ObsidianSurface = Color(0xFF221A18)        // dim surface
+val ObsidianSurfaceElevated = Color(0xFF2B211E) // elevated surface
+val ObsidianCard = Color(0xFF241B19)           // card / sheet
+val ObsidianCardHover = Color(0xFF342824)      // hovered / filled chip
 
-// Bottom navigation dock
-val DockGlassBackground = Color(0xF2222F3E)
+// Hairline structural dividers and borders — warm, low contrast.
+val HairlineBorder = Color(0xFF3A2C28)
+val HairlineBorderSubtle = Color(0xFF2B211E)
+val HairlineBorderBright = Color(0xFF4D3A34)
+
+// Typography & iconography — warm whites and taupes, never pure grey.
+val TextPrimary = Color(0xFFFBF1EC)
+val TextSecondary = Color(0xFFC7A99E)
+val TextMuted = Color(0xFF9A8178)
+val TextDark = Color(0xFF2A1D18)
+
+// Bottom navigation dock (dark mood).
+val DockGlassBackground = Color(0xF22B211E)
 val DockGlassBorder = Color(0x00000000)
-val DockPillActive = Color(0xFF1F3550)
-val DockPillActiveText = Color(0xFF229AF0)
-val DockPillInactiveText = Color(0xFF8D9BAE)
+val DockPillActive = Color(0xFF43302A)
+val DockPillActiveText = SunsetCoral
+val DockPillInactiveText = Color(0xFFAE8F84)
 
-// Telegram accent blues
-val TgBlue = Color(0xFF229AF0)
-val TgBluePressed = Color(0xFF1B87DA)
-val TgBlueLight = Color(0xFF64B5EF)
-val TgLink = Color(0xFF6AB3F3)
+// Accent — the single most-used tint across the app. Kept named `TgBlue` so the
+// hundreds of call sites keep working, but it is now sunset coral.
+val TgBlue = SunsetCoral
+val TgBluePressed = SunsetDeep
+val TgBlueLight = SunsetPink
+val TgLink = Color(0xFFFFA07A)
 
-// Chat bubbles
-val TgBubbleOut = Color(0xFF2AABEE)
-val TgBubbleIn = Color(0xFF182533)
-val TgBubbleInTime = Color(0xFF505E6C)
-val TgBubbleOutTime = Color(0xFFD8F1FF)
+// Chat bubbles — outgoing rides the sunset ramp, incoming is a warm surface.
+val TgBubbleOut = SunsetCoral
+val TgBubbleOutEnd = SunsetAmber               // gradient end for outgoing bubbles
+val TgBubbleIn = Color(0xFF2E221F)
+val TgBubbleInTime = Color(0xFFB0968C)
+val TgBubbleOutTime = Color(0xFFFFF0E6)
 
-// Chat wallpaper
-val TgWallpaperBase = Color(0xFF1D2733)
-val TgWallpaperInk = Color(0x1A8FA9C4)
+// Chat wallpaper (dark mood sunset).
+val TgWallpaperBase = Color(0xFF1A1413)
+val TgWallpaperTop = Color(0xFF3A211C)         // warm top of the sunset gradient
+val TgWallpaperBottom = Color(0xFF171011)      // deep base of the sunset gradient
+val TgWallpaperInk = Color(0x1FFFC98A)         // faint warm doodles
 
-// Avatars / online status
-val TgOnline = Color(0xFF6AB3F3)
-val TgAvatarNeutral = Color(0xFF2E455A)
+// Avatars / online status.
+val TgOnline = Color(0xFF5FD08A)               // friendly green that reads warm
+val TgAvatarNeutral = Color(0xFF4D3A34)
 
-// Telegram-style settings icon tile colours
-val SettingsIconBlue = Color(0xFF2B9BEA)
-val SettingsIconOrange = Color(0xFFF4A32B)
-val SettingsIconGreen = Color(0xFF4CC14F)
-val SettingsIconRed = Color(0xFFEF4A58)
-val SettingsIconIndigo = Color(0xFF4F6FE8)
+// Settings icon tile colours — kept warm & friendly.
+val SettingsIconBlue = Color(0xFFF4A32B)
+val SettingsIconOrange = SunsetCoral
+val SettingsIconGreen = Color(0xFF5FD08A)
+val SettingsIconRed = SunsetDeep
+val SettingsIconIndigo = Color(0xFFC98BDB)
 
-val TgErrorRed = Color(0xFFE53935)
+val TgErrorRed = Color(0xFFE2574C)
+
+// =========================================================================
+// LIGHT MOOD — "cream & peach in morning light"
+// Consumed through MaterialTheme (Theme.kt). Screens that read raw tokens still
+// show the dark mood; the warm light scheme covers Material-driven surfaces.
+// =========================================================================
+
+val WarmBackground = Color(0xFFFFF6EF)         // soft cream page
+val WarmSurface = Color(0xFFFFFBF7)            // near-white warm surface
+val WarmSurfaceElevated = Color(0xFFFFF1E6)    // elevated peach
+val WarmCard = Color(0xFFFFFFFF)
+val WarmCardHover = Color(0xFFFCE9DC)
+
+val WarmHairline = Color(0xFFF0D9C8)
+val WarmHairlineSubtle = Color(0xFFF7E7DA)
+val WarmHairlineBright = Color(0xFFE7C6B2)
+
+val WarmTextPrimary = Color(0xFF3A2A24)        // warm espresso
+val WarmTextSecondary = Color(0xFF8A6F63)
+val WarmTextMuted = Color(0xFFB49A8D)
+
+val WarmBubbleIn = Color(0xFFFFFFFF)
+val WarmBubbleInTime = Color(0xFFB49A8D)
+
+val WarmWallpaperTop = Color(0xFFFFE7D4)       // peachy top
+val WarmWallpaperBottom = Color(0xFFFFF6EF)    // cream base
+val WarmWallpaperInk = Color(0x14E2574C)       // faint coral doodles

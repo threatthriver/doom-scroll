@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -34,24 +36,34 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.securemessage.app.ui.theme.ObsidianCardHover
+import com.securemessage.app.ui.theme.ObsidianVoid
+import com.securemessage.app.ui.theme.SunsetAmber
+import com.securemessage.app.ui.theme.SunsetPink
 import com.securemessage.app.ui.theme.TgBlue
 import com.securemessage.app.ui.theme.TgOnline
 import com.securemessage.app.ui.theme.TextMuted
 import com.securemessage.app.ui.theme.TextPrimary
 
-/** Deterministic Telegram-style avatar colour derived from the title. */
+/** Deterministic warm avatar colour derived from the title — a sunset-friendly palette. */
 fun avatarColorFor(title: String): Color {
     val palette = listOf(
-        Color(0xFFE17076), Color(0xFF7BC862), Color(0xFFE5CA77), Color(0xFF65AADD),
-        Color(0xFFA695E7), Color(0xFFEE7AAE), Color(0xFF6EC9CB), Color(0xFFFA7F77),
-        Color(0xFF77BEAE), Color(0xFF9A9AC7),
+        Color(0xFFF2765E), // coral
+        Color(0xFFF4A93C), // amber
+        Color(0xFFEF8DA3), // rose
+        Color(0xFFE2634C), // deep coral
+        Color(0xFFD98C5F), // terracotta
+        Color(0xFFCB8ADB), // soft orchid
+        Color(0xFFE0A94B), // honey
+        Color(0xFF7FBE8F), // sage (warm green)
+        Color(0xFFF08C6A), // apricot
+        Color(0xFFC9736E), // dusty rose
     )
     val key = title.trim().lowercase()
     if (key.isEmpty()) return palette[0]
     return palette[(key.sumOf { it.code } + key.length) % palette.size]
 }
 
-/** Circular avatar with bold initials, matching Telegram's list avatars. */
+/** Circular avatar with bold initials and a soft warm sheen. */
 @Composable
 fun MonochromeAvatar(
     initials: String,
@@ -60,9 +72,14 @@ fun MonochromeAvatar(
     inverted: Boolean = false,
     modifier: Modifier = Modifier,
     color: Color? = null,
+    ring: Boolean = false,
 ) {
     val cleanInitials = initials.trim().take(2).uppercase().ifEmpty { "?" }
-    val fill = color ?: if (inverted) Color(0xFF2E455A) else avatarColorFor(initials)
+    val base = color ?: if (inverted) Color(0xFF4D3A34) else avatarColorFor(initials)
+    // A gentle top-to-bottom warm sheen gives the flat initials circle a little depth.
+    val fillBrush = Brush.verticalGradient(
+        listOf(base.lighten(0.12f), base, base.darken(0.10f)),
+    )
     Box(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center,
@@ -71,7 +88,19 @@ fun MonochromeAvatar(
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(fill),
+                .then(
+                    if (ring) {
+                        Modifier.border(
+                            width = (size.value * 0.045f).dp.coerceAtLeast(1.5.dp),
+                            brush = Brush.linearGradient(listOf(SunsetAmber, SunsetPink)),
+                            shape = CircleShape,
+                        )
+                    } else {
+                        Modifier
+                    },
+                )
+                .clip(CircleShape)
+                .background(fillBrush),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -79,7 +108,7 @@ fun MonochromeAvatar(
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = (size.value * 0.38f).sp,
-                letterSpacing = (-0.5).sp,
+                letterSpacing = (-0.3).sp,
             )
         }
         if (showOnlineBadge) {
@@ -88,7 +117,7 @@ fun MonochromeAvatar(
                     .size(size * 0.28f)
                     .align(Alignment.BottomEnd)
                     .clip(CircleShape)
-                    .background(ObsidianCardHover)
+                    .background(ObsidianVoid)
                     .padding(2.dp)
                     .clip(CircleShape)
                     .background(TgOnline),
@@ -96,6 +125,22 @@ fun MonochromeAvatar(
         }
     }
 }
+
+/** Nudge a colour toward white by [fraction] (0..1) for soft highlights. */
+private fun Color.lighten(fraction: Float): Color = Color(
+    red = red + (1f - red) * fraction,
+    green = green + (1f - green) * fraction,
+    blue = blue + (1f - blue) * fraction,
+    alpha = alpha,
+)
+
+/** Nudge a colour toward black by [fraction] (0..1) for soft shadows. */
+private fun Color.darken(fraction: Float): Color = Color(
+    red = red * (1f - fraction),
+    green = green * (1f - fraction),
+    blue = blue * (1f - fraction),
+    alpha = alpha,
+)
 
 /** Blue circular unread badge. */
 @Composable
