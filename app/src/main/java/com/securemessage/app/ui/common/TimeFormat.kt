@@ -42,3 +42,20 @@ fun formatDayLabel(ts: Timestamp?, now: Date = Date()): String {
         else -> SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(target.time)
     }
 }
+
+/** Short "time ago" label for feeds: "now", "5m", "2h", "3d", or a date for anything older. */
+fun relativeTime(ts: Timestamp?, now: Date = Date()): String {
+    ts ?: return ""
+    val diffMs = now.time - ts.toDate().time
+    if (diffMs < 0) return "now"
+    val minutes = diffMs / 60_000
+    val hours = minutes / 60
+    val days = hours / 24
+    return when {
+        minutes < 1 -> "now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        days < 7 -> "${days}d ago"
+        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(ts.toDate())
+    }
+}

@@ -3,7 +3,8 @@ package com.securemessage.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ---------------------------------------------------------------------------
-// "Warm Sunset" palette — friendly, cozy, human.
+// Legacy token names, re-pointed to the WEAVE palette (see Weave.kt).
+// "Warm Sunset" palette (historical) — friendly, cozy, human.
 //
 // Two moods share one language: a cream / peach LIGHT mode and a warm charcoal
 // DARK mode, both lit by a coral -> amber -> pink sunset accent.
@@ -32,21 +33,21 @@ val SunsetGlow = Color(0xFFFFC98A)    // warm glow for shadows & rings
 // =========================================================================
 
 // Window / page backgrounds — warm charcoal, never cold grey.
-val ObsidianVoid = Color(0xFF1A1413)           // page background (warm near-black)
-val ObsidianSurface = Color(0xFF221A18)        // dim surface
-val ObsidianSurfaceElevated = Color(0xFF2B211E) // elevated surface
-val ObsidianCard = Color(0xFF241B19)           // card / sheet
-val ObsidianCardHover = Color(0xFF342824)      // hovered / filled chip
+val ObsidianVoid = Color(0xFF0C0D11)           // page background (warm near-black)
+val ObsidianSurface = Color(0xFF121318)        // dim surface
+val ObsidianSurfaceElevated = Color(0xFF1F2027) // elevated surface
+val ObsidianCard = Color(0xFF17181E)           // card / sheet
+val ObsidianCardHover = Color(0xFF282A32)      // hovered / filled chip
 
 // Hairline structural dividers and borders — warm, low contrast.
-val HairlineBorder = Color(0xFF3A2C28)
-val HairlineBorderSubtle = Color(0xFF2B211E)
-val HairlineBorderBright = Color(0xFF4D3A34)
+val HairlineBorder = Color(0xFF2A2B34)
+val HairlineBorderSubtle = Color(0xFF1C1D24)
+val HairlineBorderBright = Color(0xFF3A3C48)
 
 // Typography & iconography — warm whites and taupes, never pure grey.
-val TextPrimary = Color(0xFFFBF1EC)
-val TextSecondary = Color(0xFFC7A99E)
-val TextMuted = Color(0xFF9A8178)
+val TextPrimary = Color(0xFFF2F3FA)
+val TextSecondary = Color(0xFFC3C6D4)
+val TextMuted = Color(0xFF868AA0)
 val TextDark = Color(0xFF2A1D18)
 
 // Bottom navigation dock (dark mood).
@@ -58,8 +59,8 @@ val DockPillInactiveText = Color(0xFFAE8F84)
 
 // Accent — the single most-used tint across the app. Kept named `TgBlue` so the
 // hundreds of call sites keep working, but it is now sunset coral.
-val TgBlue = SunsetCoral
-val TgBluePressed = SunsetDeep
+val TgBlue = Color(0xFF8F87FF)
+val TgBluePressed = Color(0xFF6A61F0)
 val TgBlueLight = SunsetPink
 val TgLink = Color(0xFFFFA07A)
 
@@ -87,7 +88,7 @@ val SettingsIconGreen = Color(0xFF5FD08A)
 val SettingsIconRed = SunsetDeep
 val SettingsIconIndigo = Color(0xFFC98BDB)
 
-val TgErrorRed = Color(0xFFE2574C)
+val TgErrorRed = Color(0xFFF2645B)
 
 // =========================================================================
 // LIGHT MOOD — "cream & peach in morning light"

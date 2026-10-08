@@ -49,5 +49,28 @@ object AppViewModelFactory {
             val c = container()
             com.securemessage.app.ui.profile.ProfileViewModel(c.authRepository, c.userRepository)
         }
+        initializer {
+            val c = container()
+            com.securemessage.app.ui.weave.HomeViewModel(
+                c.authRepository,
+                c.userRepository,
+                c.momentRepository,
+                c.sessionRepository,
+                c.circleRepository,
+                c.spaceRepository,
+            )
+        }
+        initializer {
+            val c = container()
+            com.securemessage.app.ui.weave.MomentViewModel(
+                createSavedStateHandle(), c.authRepository, c.userRepository, c.momentRepository, c.chatRepository,
+            )
+        }
+        initializer {
+            val c = container()
+            com.securemessage.app.ui.weave.SessionViewModel(
+                createSavedStateHandle(), c.authRepository, c.userRepository, c.sessionRepository,
+            )
+        }
     }
 }

@@ -103,16 +103,15 @@ internal fun AuthScaffold(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                com.securemessage.app.ui.common.HushOrb(size = 48.dp)
                 Column {
                     Text(
-                        text = "Hush",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = "WEAVE",
+                        fontSize = 34.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive,
                         color = TextPrimary,
                     )
                     Text(
-                        text = "Private chats, kept quiet",
+                        text = "Real people, real moments",
                         fontSize = 12.sp,
                         color = TextSecondary,
                     )

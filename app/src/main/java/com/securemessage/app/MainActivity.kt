@@ -83,11 +83,11 @@ class MainActivity : FragmentActivity() {
                                 .background(Color.Black)
                                 .clickable(
                                     role = Role.Button,
-                                    onClickLabel = "Unlock Hush",
+                                    onClickLabel = "Unlock WEAVE",
                                 ) { showUnlockPrompt() }
-                                .semantics { this.contentDescription = "Hush is locked. Double tap to unlock." },
+                                .semantics { this.contentDescription = "WEAVE is locked. Double tap to unlock." },
                             contentAlignment = Alignment.Center,
-                        ) { Text("Hush is locked. Tap to unlock.", color = Color.White) }
+                        ) { Text("WEAVE is locked. Tap to unlock.", color = Color.White) }
                     }
                 }
             }
@@ -147,7 +147,7 @@ class MainActivity : FragmentActivity() {
         )
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Unlock Hush")
+                .setTitle("Unlock WEAVE")
                 .setAllowedAuthenticators(authenticators)
                 .build(),
         )

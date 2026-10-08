@@ -411,7 +411,7 @@ class ChatViewModel(
             val ch = channel
             if (ch == null) {
                 // Never fall back to plaintext: this is an end-to-end encrypted chat.
-                restore("Can't send yet: ${_state.value.title} hasn't set up secure messaging. Ask them to open Hush, then try again.")
+                restore("Can't send yet: ${_state.value.title} hasn't set up secure messaging. Ask them to open WEAVE, then try again.")
                 return@launch
             }
             // Hard gate: if the peer's safety number changed and the user hasn't acknowledged it,

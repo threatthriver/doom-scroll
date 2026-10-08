@@ -49,11 +49,11 @@ android {
         applicationId = "com.securemessage.app"
         minSdk = 24
         targetSdk = 35
-        // Keep this in sync with the GitHub release tag (v1.4.7). The updater compares
+        // Keep this in sync with the GitHub release tag (v1.5.0). The updater compares
         // this version with the latest release tag, so a mismatch makes it offer the
         // same update again and again.
-        versionCode = 15
-        versionName = "1.4.7"
+        versionCode = 16
+        versionName = "1.5.0"
 
         // Public URL of the free Cloudflare Worker that sends push alerts (not a secret: it only
         // acts for callers holding a valid Firebase ID token). Blank disables push. Override with

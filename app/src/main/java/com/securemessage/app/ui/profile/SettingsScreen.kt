@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -63,28 +65,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.securemessage.app.data.PrivacySettings
 import com.securemessage.app.ui.common.AppViewModelFactory
-import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.common.openNotificationSettings
-import com.securemessage.app.ui.theme.HairlineBorder
-import com.securemessage.app.ui.theme.HairlineBorderSubtle
-import com.securemessage.app.ui.theme.ObsidianCard
-import com.securemessage.app.ui.theme.ObsidianVoid
-import com.securemessage.app.ui.theme.PureWhite
-import com.securemessage.app.ui.theme.SettingsIconBlue
-import com.securemessage.app.ui.theme.SettingsIconGreen
-import com.securemessage.app.ui.theme.SettingsIconIndigo
-import com.securemessage.app.ui.theme.SettingsIconOrange
-import com.securemessage.app.ui.theme.SettingsIconRed
-import com.securemessage.app.ui.theme.TextMuted
-import com.securemessage.app.ui.theme.TextPrimary
-import com.securemessage.app.ui.theme.TextSecondary
-import com.securemessage.app.ui.theme.TgBlue
-import com.securemessage.app.ui.theme.TgErrorRed
+
+private val W = com.securemessage.app.ui.theme.Weave
+private val HairlineBorder = W.Hairline
+private val HairlineBorderSubtle = W.HairlineSoft
+private val ObsidianCard = W.Surface
+private val ObsidianVoid = W.Bg
+private val PureWhite = W.Ink
+private val TextPrimary = W.Ink
+private val TextSecondary = W.InkBody
+private val TextMuted = W.InkMuted
+private val TgBlue = W.Indigo
+private val TgErrorRed = W.Error
+private val SettingsIconBlue = W.Blue
+private val SettingsIconGreen = Color(0xFF3FB27F)
+private val SettingsIconOrange = Color(0xFFE59A3C)
+private val SettingsIconRed = Color(0xFFE0566B)
+private val SettingsIconIndigo = W.IndigoDeep
 
 @Composable
 fun SettingsScreen(
     onSignOut: () -> Unit,
-    onOpenProfile: () -> Unit = {},
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     vm: ProfileViewModel = viewModel(factory = AppViewModelFactory.Factory),
 ) {
@@ -93,6 +96,7 @@ fun SettingsScreen(
     val haptic = LocalHapticFeedback.current
     val snackbar = remember { SnackbarHostState() }
     var showSignOutConfirm by remember { mutableStateOf(false) }
+    var showKey by remember { mutableStateOf(false) }
     var screenSecurity by remember { mutableStateOf(PrivacySettings.isScreenSecurityEnabled(context)) }
     var notifPreview by remember { mutableStateOf(PrivacySettings.isNotificationPreviewEnabled(context)) }
     fun toggleNotifPreview() {
@@ -131,13 +135,6 @@ fun SettingsScreen(
         vm.refreshCachedApk(context.applicationContext)
     }
 
-    val displayName = state.displayName.ifEmpty { "User" }
-    val initials = displayName.split(" ")
-        .mapNotNull { it.firstOrNull()?.toString() }
-        .take(2)
-        .joinToString("")
-        .ifEmpty { displayName.take(2).uppercase() }
-
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -146,49 +143,15 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
             Spacer(Modifier.height(16.dp))
 
-            // Profile summary: tap to open the full profile
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable(onClickLabel = "Open profile") {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onOpenProfile()
-                    }
-                    .padding(vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                MonochromeAvatar(
-                    initials = initials,
-                    size = 80.dp,
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = displayName,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PureWhite,
-                )
-                if (state.username.isNotEmpty()) {
-                    Text(
-                        text = "@${state.username}",
-                        fontSize = 14.sp,
-                        color = TextMuted,
-                    )
-                }
-                Text(
-                    text = state.email,
-                    fontSize = 13.sp,
-                    color = TextSecondary,
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
+            com.securemessage.app.ui.weave.WeaveTopBar("Settings", onBack = onBack)
+            Spacer(Modifier.height(8.dp))
 
             SectionTitle("Settings")
             Spacer(Modifier.height(8.dp))
@@ -202,24 +165,13 @@ fun SettingsScreen(
             ) {
                 Column {
                     SettingsRow(
-                        icon = Icons.Filled.Person,
-                        title = "Profile",
-                        subtitle = "Name, username and bio",
-                        iconColor = SettingsIconBlue,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onOpenProfile()
-                        },
-                    )
-                    RowDivider()
-                    SettingsRow(
                         icon = Icons.Filled.Lock,
                         title = "Encryption key",
                         subtitle = "See your key fingerprint",
                         iconColor = SettingsIconGreen,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onOpenProfile()
+                            showKey = true
                         },
                     )
                     RowDivider()
@@ -313,7 +265,7 @@ fun SettingsScreen(
                         // weight(1f) is what keeps the button from being squeezed
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Hush updates",
+                                text = "WEAVE updates",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = PureWhite,
@@ -536,6 +488,35 @@ fun SettingsScreen(
                     )
                 }
             },
+        )
+    }
+
+    if (showKey) {
+        val fingerprint = remember {
+            runCatching {
+                val pub = com.securemessage.app.data.crypto.KeyStoreManager.getIdentityPublicKey(context)
+                com.securemessage.app.data.crypto.E2EEncryption.computeFingerprint(pub.encoded).chunked(4).joinToString(" ")
+            }.getOrElse { "Unavailable" }
+        }
+        AlertDialog(
+            onDismissRequest = { showKey = false },
+            containerColor = ObsidianCard,
+            shape = RoundedCornerShape(24.dp),
+            title = { Text("Your key fingerprint", fontWeight = FontWeight.Bold, color = PureWhite) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(fingerprint, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontSize = 14.sp, color = TextPrimary)
+                    Text("Each chat also has its own security code under the chat menu.", fontSize = 13.sp, color = TextSecondary)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Key fingerprint", fingerprint))
+                    showKey = false
+                }) { Text("Copy", color = TgBlue, fontWeight = FontWeight.SemiBold) }
+            },
+            dismissButton = { TextButton(onClick = { showKey = false }) { Text("Close", color = TextSecondary) } },
         )
     }
 

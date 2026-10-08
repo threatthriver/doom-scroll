@@ -16,4 +16,8 @@ interface UserRepository {
 
     /** Update profile fields (displayName, bio, photoUrl). */
     suspend fun updateProfile(uid: String, displayName: String, bio: String, photoUrl: String): Result<Unit>
+
+    /** Update the WEAVE profile details (headline, place, interests). */
+    suspend fun updateDetails(uid: String, headline: String, place: String, interests: List<String>): Result<Unit> =
+        Result.failure(UnsupportedOperationException())
 }

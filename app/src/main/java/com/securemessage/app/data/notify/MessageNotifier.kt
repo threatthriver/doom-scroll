@@ -203,7 +203,7 @@ object MessageNotifier {
         val style = existingStyle(context, chatId) ?: return
         val title = existing.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         style.addMessage("Couldn't send your reply. Open the chat to try again.", System.currentTimeMillis(),
-            Person.Builder().setName("Hush").build())
+            Person.Builder().setName("WEAVE").build())
         post(context, chatId, title, style, alertOnce = true, showText = true)
     }
 

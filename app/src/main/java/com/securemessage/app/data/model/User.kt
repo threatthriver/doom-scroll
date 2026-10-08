@@ -11,4 +11,9 @@ data class User(
     val displayName: String = "",
     val photoUrl: String = "",
     val bio: String = "",
+    /** Short line under the name, e.g. "Student · ML & Robotics". */
+    val headline: String = "",
+    /** Coarse place label (city / campus), never coordinates. */
+    val place: String = "",
+    val interests: List<String> = emptyList(),
 )

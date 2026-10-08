@@ -80,12 +80,26 @@ class FirestoreUserRepository(private val db: FirebaseFirestore) : UserRepositor
         Unit
     }.onFailure { Log.w(TAG, "updateProfile failed", it) }
 
+    override suspend fun updateDetails(uid: String, headline: String, place: String, interests: List<String>): Result<Unit> = runCatching {
+        users.document(uid).update(
+            mapOf(
+                "headline" to headline.trim().take(80),
+                "place" to place.trim().take(60),
+                "interests" to interests.map { it.trim().take(30) }.filter { it.isNotEmpty() }.distinct().take(12),
+            )
+        ).await()
+        Unit
+    }.onFailure { Log.w(TAG, "updateDetails failed", it) }
+
     private fun DocumentSnapshot.toUser() = User(
         uid = getString("uid") ?: id,
         username = getString("username").orEmpty(),
         displayName = getString("displayName").orEmpty(),
         photoUrl = getString("photoUrl").orEmpty(),
         bio = getString("bio").orEmpty(),
+        headline = getString("headline").orEmpty(),
+        place = getString("place").orEmpty(),
+        interests = FirestoreCoerce.stringList(get("interests")),
     )
 
     private companion object {

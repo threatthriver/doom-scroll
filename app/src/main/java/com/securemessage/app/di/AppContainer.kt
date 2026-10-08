@@ -50,6 +50,20 @@ class AppContainer(private val appContext: Context) {
 
     val chatRepository: ChatRepository by lazy { FirestoreChatRepository(firestore, pushNotifier, appScope) }
 
+    // --- WEAVE primitives -------------------------------------------------
+    val momentRepository: com.securemessage.app.data.weave.MomentRepository by lazy {
+        com.securemessage.app.data.weave.FirestoreMomentRepository(firestore)
+    }
+    val sessionRepository: com.securemessage.app.data.weave.SessionRepository by lazy {
+        com.securemessage.app.data.weave.FirestoreSessionRepository(firestore)
+    }
+    val circleRepository: com.securemessage.app.data.weave.CircleRepository by lazy {
+        com.securemessage.app.data.weave.FirestoreCircleRepository(firestore)
+    }
+    val spaceRepository: com.securemessage.app.data.weave.SpaceRepository by lazy {
+        com.securemessage.app.data.weave.FirestoreSpaceRepository(firestore)
+    }
+
     val pushTokenRepository: PushTokenRepository by lazy {
         FcmTokenRepository(firebaseAuth, firestore) { FirebaseMessaging.getInstance() }
     }

@@ -16,6 +16,13 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Encrypted previews are base64 ciphertext; show a short label instead. */
+internal fun previewText(lastMessage: String, empty: String): String = when {
+    lastMessage.isEmpty() -> empty
+    com.securemessage.app.data.crypto.E2EEncryption.looksEncrypted(lastMessage) -> "Encrypted message"
+    else -> lastMessage
+}
+
 data class ConversationsUiState(
     val chats: List<Chat> = emptyList(),
     /** Chats this user has archived — hidden from the main list. */

@@ -25,14 +25,20 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.uid == uid;
       allow update: if isSignedIn() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['displayName', 'bio', 'photoUrl'])
+            .hasOnly(['displayName', 'bio', 'photoUrl', 'headline', 'place', 'interests'])
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() > 0
         && request.resource.data.displayName.size() <= 50
         && request.resource.data.get('bio', '') is string
         && request.resource.data.get('bio', '').size() <= 160
         && request.resource.data.get('photoUrl', '') is string
-        && request.resource.data.get('photoUrl', '').size() <= 500;
+        && request.resource.data.get('photoUrl', '').size() <= 500
+        && request.resource.data.get('headline', '') is string
+        && request.resource.data.get('headline', '').size() <= 80
+        && request.resource.data.get('place', '') is string
+        && request.resource.data.get('place', '').size() <= 60
+        && request.resource.data.get('interests', []) is list
+        && request.resource.data.get('interests', []).size() <= 12;
       allow delete: if isSignedIn() && request.auth.uid == uid;
 
       // FCM push tokens: owner-only, never part of the public profile. Doc id = token.
@@ -95,6 +101,136 @@ service cloud.firestore {
           && resource.data.senderId == request.auth.uid
           && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
       }
+    }
+
+    // Shared journal feed. Readable by anyone signed in. A post is owned by its author, who may
+    // create and delete it. Likes are a list of uids: any signed-in user may add or remove ONLY
+    // their own uid from likedBy (nothing else about the post may change on such an update).
+    match /journalPosts/{postId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() <= 50
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 2000
+        && request.resource.data.likedBy == []
+        && request.resource.data.commentCount == 0
+        && request.resource.data.createdAt == request.time;
+
+      // Like / unlike: only likedBy changes, and the net change is exactly the caller's own uid
+      // being added or removed. Every other uid in the list must stay untouched.
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy'])
+        && request.resource.data.likedBy is list
+        && (
+          // Like: I wasn't in the old list, I'm the only addition, nothing removed.
+          (!(request.auth.uid in resource.data.likedBy)
+            && request.resource.data.likedBy.toSet()
+                 == resource.data.likedBy.toSet().union([request.auth.uid].toSet()))
+          ||
+          // Unlike: I was in the old list, I'm the only removal, nothing added.
+          (request.auth.uid in resource.data.likedBy
+            && request.resource.data.likedBy.toSet()
+                 == resource.data.likedBy.toSet().difference([request.auth.uid].toSet()))
+        );
+
+      allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+    }
+
+    // ===================== WEAVE primitives =====================
+
+    // Moments replace posts. Readable by anyone signed in. Authored & deleted by their author.
+    // Reactions are intent tags: any signed-in user may set/clear ONLY their own entry.
+    match /moments/{momentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 2000
+        && request.resource.data.reactions.size() == 0
+        && request.resource.data.responseCount == 0
+        && request.resource.data.createdAt == request.time;
+      // Only the reactions map may change on update, and only the caller's own key within it.
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+        && request.resource.data.reactions is map
+        && request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys()
+             .hasOnly([request.auth.uid]);
+      allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+
+      // Responses: anyone signed in may reply as themselves; authors may delete their own.
+      match /responses/{responseId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+      }
+    }
+
+    // Sessions: anyone signed in may read live sessions and join/leave (participant/listener
+    // arrays). The host creates it and may end it. Join/leave may only touch the roster arrays.
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        // Host may change anything on their own session (e.g. end it).
+        resource.data.hostId == request.auth.uid
+        // Anyone may add/remove themselves from the participant/listener rosters only.
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['participantIds', 'listenerIds'])
+      );
+      allow delete: if isSignedIn() && resource.data.hostId == request.auth.uid;
+
+      // Session chat: anyone signed in who is in the session (participant or listener) may post.
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.createdAt == request.time
+          && (request.auth.uid in get(/databases/$(database)/documents/sessions/$(sessionId)).data.participantIds
+              || request.auth.uid in get(/databases/$(database)/documents/sessions/$(sessionId)).data.listenerIds);
+        allow delete: if isSignedIn() && resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // Circles: members may read; owner creates; join/leave edits membership only.
+    match /circles/{circleId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        resource.data.ownerId == request.auth.uid
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['memberIds', 'memberNames'])
+      );
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Spaces: discoverable by anyone signed in; join/leave edits membership & counts only.
+    // Anyone signed in may create a space with themselves as the only member.
+    match /spaces/{spaceId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.creatorId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.memberCount == 1;
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['memberIds', 'memberCount', 'onlineCount']);
+      allow delete: if false;
     }
 
     // Public keys for E2EE key exchange: anyone signed in may read, only the owner may write.

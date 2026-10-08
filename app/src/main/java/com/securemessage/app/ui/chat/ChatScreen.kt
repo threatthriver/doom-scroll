@@ -97,34 +97,41 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.securemessage.app.data.model.Message
 import com.securemessage.app.data.notify.MessageNotifier
 import com.securemessage.app.ui.common.AppViewModelFactory
-import com.securemessage.app.ui.common.MonochromeAvatar
 import com.securemessage.app.ui.common.formatTime
 import com.securemessage.app.ui.common.formatDayLabel
 import com.securemessage.app.ui.common.isSameDay
-import com.securemessage.app.ui.common.TelegramWallpaper
-import com.securemessage.app.ui.theme.DockGlassBackground
-import com.securemessage.app.ui.theme.TgErrorRed
-import com.securemessage.app.ui.theme.TgLink
-import com.securemessage.app.ui.theme.HairlineBorder
-import com.securemessage.app.ui.theme.HairlineBorderSubtle
-import com.securemessage.app.ui.theme.ObsidianCard
-import com.securemessage.app.ui.theme.ObsidianCardHover
-import com.securemessage.app.ui.theme.ObsidianSurfaceElevated
-import com.securemessage.app.ui.theme.ObsidianVoid
 import com.securemessage.app.ui.theme.PureBlack
 import com.securemessage.app.ui.theme.PureWhite
-import com.securemessage.app.ui.theme.TgBlue
-import com.securemessage.app.ui.theme.TgBubbleIn
-import com.securemessage.app.ui.theme.TgBubbleInTime
-import com.securemessage.app.ui.theme.SunsetAmber
-import com.securemessage.app.ui.theme.SunsetCoral
-import com.securemessage.app.ui.theme.SunsetPink
-import com.securemessage.app.ui.theme.TgBubbleOutTime
-import com.securemessage.app.ui.theme.TgWallpaperBase
-import com.securemessage.app.ui.theme.TextMuted
-import com.securemessage.app.ui.theme.TextPrimary
-import com.securemessage.app.ui.theme.TextSecondary
+import com.securemessage.app.ui.theme.Weave
 import kotlinx.coroutines.launch
+
+// ---------------------------------------------------------------------------
+// Chat palette, mapped onto the app-wide design system (WB). The chat screen was
+// written against the old dark "sunset" token names; rather than touch every call
+// site, those names are re-pointed here to the minimal blue/light system, so the
+// whole chat page re-themes from this one block. Change WB, change the chat.
+// ---------------------------------------------------------------------------
+private val TextPrimary = Weave.Ink
+private val TextSecondary = Weave.InkBody
+private val TextMuted = Weave.InkMuted
+private val TgBlue = Weave.Indigo
+private val TgLink = Weave.Lavender
+private val TgErrorRed = Weave.Error
+private val HairlineBorder = Weave.Hairline
+private val HairlineBorderSubtle = Weave.HairlineSoft
+private val ObsidianCard = Weave.Surface
+private val ObsidianCardHover = Weave.SurfaceHi
+private val ObsidianSurfaceElevated = Weave.SurfaceAlt
+private val ObsidianVoid = Weave.Bg
+private val DockGlassBackground = Weave.Surface
+private val TgWallpaperBase = Weave.Bg
+private val TgBubbleIn = Weave.BubbleInBg
+private val TgBubbleInTime = Weave.BubbleInMeta
+private val TgBubbleOutTime = Weave.BubbleOutMeta
+// Outgoing bubble gradient stops (blue -> indigo), reusing the old names.
+private val SunsetCoral = Weave.Indigo
+private val SunsetAmber = Weave.IndigoDeep
+private val SunsetPink = Weave.IndigoDeep
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -145,6 +152,14 @@ fun ChatScreen(
     var replyingToMessage by remember { mutableStateOf<Message?>(null) }
     var showSecurityCode by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<Message?>(null) }
+    // Briefly flashes the message you jumped to from a quoted reply, so it's easy to spot.
+    var highlightedId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(highlightedId) {
+        if (highlightedId != null) {
+            kotlinx.coroutines.delay(1400)
+            highlightedId = null
+        }
+    }
     // null = search closed. Search runs on the decrypted messages already loaded on the phone.
     var searchQuery by remember { mutableStateOf<String?>(null) }
 
@@ -212,7 +227,6 @@ fun ChatScreen(
     ) {
         // Own graphics layer: the pattern is painted once and reused while the list scrolls,
         // instead of being redrawn whenever something above it changes.
-        TelegramWallpaper(modifier = Modifier.fillMaxSize().graphicsLayer())
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -231,7 +245,7 @@ fun ChatScreen(
                         .size(46.dp)
                         .clip(CircleShape)
                         .background(DockGlassBackground)
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                        .border(1.dp, HairlineBorder, CircleShape)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onBack()
@@ -252,15 +266,12 @@ fun ChatScreen(
                         .height(46.dp)
                         .clip(RoundedCornerShape(23.dp))
                         .background(DockGlassBackground)
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(23.dp))
+                        .border(1.dp, HairlineBorder, RoundedCornerShape(23.dp))
                         .padding(start = 3.dp, end = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    MonochromeAvatar(
-                        initials = initials,
-                        size = 40.dp,
-                    )
+                    com.securemessage.app.ui.weave.WeaveAvatar(name = state.title, size = 40.dp)
                     Column(verticalArrangement = Arrangement.Center) {
                         Text(
                             text = state.title,
@@ -289,7 +300,7 @@ fun ChatScreen(
                         .size(46.dp)
                         .clip(CircleShape)
                         .background(DockGlassBackground)
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), CircleShape)
+                        .border(1.dp, HairlineBorder, CircleShape)
                         .clickable { showHeaderMenu = true },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -332,7 +343,7 @@ fun ChatScreen(
                         .padding(horizontal = 10.dp)
                         .clip(RoundedCornerShape(24.dp))
                         .background(DockGlassBackground)
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                        .border(1.dp, HairlineBorder, RoundedCornerShape(24.dp))
                         .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -422,32 +433,78 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     // Newest first: with reverseLayout the first item sits at the bottom.
-                    items(rows, key = { it.message.id }) { row ->
+                    // contentType lets the lazy list recycle like-shaped rows (mine vs theirs vs
+                    // day-divider rows) instead of re-composing from scratch while scrolling.
+                    items(
+                        rows,
+                        key = { it.message.id },
+                        contentType = { row ->
+                            val mine = row.message.senderId == myUid
+                            when {
+                                row.dayLabel != null && mine -> "day_mine"
+                                row.dayLabel != null -> "day_theirs"
+                                mine -> "mine"
+                                else -> "theirs"
+                            }
+                        },
+                    ) { row ->
                         val msg = row.message
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .animateItem(),
+                                .animateItem(
+                                    // Only fade on appearance; no placement spring, which was
+                                    // causing bubbles to visibly shuffle during pagination.
+                                    placementSpec = null,
+                                ),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             // One divider per calendar day, above its first message.
                             row.dayLabel?.let { TelegramDateChip(label = it) }
 
-                            TelegramMessageBubble(
-                                message = msg,
-                                isMine = msg.senderId == myUid,
-                                userReaction = msg.reactions[myUid],
-                                reactionCount = msg.reactions.size,
-                                replySenderName = if (msg.replyToSender == myUid) "You" else state.title,
-                                onTap = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    selectedMessageForMenu = msg
+                            val mine = msg.senderId == myUid
+                            SwipeToReply(
+                                isMine = mine,
+                                onReply = {
+                                    if (!isLockedPlaceholder(msg.text)) replyingToMessage = msg
                                 },
-                                onLongPress = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    selectedMessageForMenu = msg
-                                },
-                            )
+                            ) {
+                                TelegramMessageBubble(
+                                    message = msg,
+                                    isMine = mine,
+                                    userReaction = msg.reactions[myUid],
+                                    reactionCount = msg.reactions.size,
+                                    replySenderName = if (msg.replyToSender == myUid) "You" else state.title,
+                                    onTap = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        selectedMessageForMenu = msg
+                                    },
+                                    onLongPress = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedMessageForMenu = msg
+                                    },
+                                    onDoubleTap = {
+                                        // Quick ❤️ react, the common double-tap gesture.
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        vm.addReaction(msg, "❤️")
+                                    },
+                                    highlighted = msg.id == highlightedId,
+                                    onQuotedReplyTap = if (msg.replyToId.isNotEmpty()) {
+                                        {
+                                            val index = rows.indexOfFirst { it.message.id == msg.replyToId }
+                                            if (index >= 0) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                highlightedId = msg.replyToId
+                                                coroutineScope.launch { listState.animateScrollToItem(index) }
+                                            } else {
+                                                coroutineScope.launch { snackbar.showSnackbar("Scroll up to load that message") }
+                                            }
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
                         }
                     }
 
@@ -478,7 +535,8 @@ fun ChatScreen(
                                 Column(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(16.dp))
-                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .background(Weave.Surface)
+                                        .border(1.dp, HairlineBorder, RoundedCornerShape(16.dp))
                                         .padding(horizontal = 20.dp, vertical = 16.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -493,12 +551,12 @@ fun ChatScreen(
                                         text = "Couldn't load messages",
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White,
+                                        color = TextPrimary,
                                     )
                                     Text(
                                         text = state.error ?: "Check your connection and try again.",
                                         fontSize = 13.sp,
-                                        color = Color.White.copy(alpha = 0.8f),
+                                        color = TextSecondary,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     )
                                 }
@@ -517,7 +575,8 @@ fun ChatScreen(
                                 Column(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(16.dp))
-                                        .background(Color.Black.copy(alpha = 0.28f))
+                                        .background(Weave.Surface)
+                                        .border(1.dp, HairlineBorder, RoundedCornerShape(16.dp))
                                         .padding(horizontal = 20.dp, vertical = 16.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -532,12 +591,12 @@ fun ChatScreen(
                                         text = "No messages yet",
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White,
+                                        color = TextPrimary,
                                     )
                                     Text(
                                         text = "Say hello. Messages in this chat are end-to-end encrypted.",
                                         fontSize = 13.sp,
-                                        color = Color.White.copy(alpha = 0.8f),
+                                        color = TextSecondary,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     )
                                 }
@@ -545,7 +604,7 @@ fun ChatScreen(
                         }
                     }
                     if (state.isLoadingMore) {
-                        item {
+                        item(key = "loading_more", contentType = "spinner") {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -553,7 +612,7 @@ fun ChatScreen(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 CircularProgressIndicator(
-                                    color = PureWhite,
+                                    color = TgBlue,
                                     strokeWidth = 2.dp,
                                     modifier = Modifier.size(24.dp),
                                 )
@@ -568,10 +627,9 @@ fun ChatScreen(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(end = 16.dp, bottom = 16.dp)
-                            .size(38.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(ObsidianCard)
-                            .border(1.dp, HairlineBorder, CircleShape)
+                            .background(TgBlue)
                             .clickable {
                                 coroutineScope.launch {
                                     listState.animateScrollToItem(0)
@@ -582,8 +640,8 @@ fun ChatScreen(
                         Icon(
                             imageVector = Icons.Filled.KeyboardArrowDown,
                             contentDescription = "Scroll to bottom",
-                            tint = PureWhite,
-                            modifier = Modifier.size(20.dp),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
                         )
                     }
                 }
@@ -627,12 +685,12 @@ fun ChatScreen(
                                 .width(3.dp)
                                 .height(34.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(PureWhite),
+                                .background(TgBlue),
                         )
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Reply,
                             contentDescription = null,
-                            tint = PureWhite,
+                            tint = TgBlue,
                             modifier = Modifier.size(16.dp),
                         )
                         Column {
@@ -640,7 +698,7 @@ fun ChatScreen(
                                 text = if (replyMsg.senderId == myUid) "Replying to yourself" else "Replying to ${state.title}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = PureWhite,
+                                color = TgBlue,
                             )
                             Text(
                                 text = replyMsg.text,
@@ -684,7 +742,7 @@ fun ChatScreen(
                             .heightIn(min = 48.dp)
                             .clip(RoundedCornerShape(24.dp))
                             .background(DockGlassBackground)
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                            .border(1.dp, HairlineBorder, RoundedCornerShape(24.dp))
                             .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -872,17 +930,22 @@ private fun TelegramMessageBubble(
     userReaction: String?,
     reactionCount: Int,
     replySenderName: String = "",
+    highlighted: Boolean = false,
     onTap: () -> Unit,
     onLongPress: () -> Unit,
+    onDoubleTap: () -> Unit = {},
+    onQuotedReplyTap: (() -> Unit)? = null,
 ) {
-    val bubbleShape = if (isMine) {
-        RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
-    } else {
-        RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)
+    val bubbleShape = remember(isMine) {
+        if (isMine) {
+            RoundedCornerShape(20.dp, 20.dp, 6.dp, 20.dp)
+        } else {
+            RoundedCornerShape(20.dp, 20.dp, 20.dp, 6.dp)
+        }
     }
 
-    // Warm Sunset bubbles: outgoing rides the coral -> amber -> pink sunset ramp on a soft
-    // diagonal, incoming is a cozy warm surface. White text reads cleanly on both.
+    // Minimal blue bubbles: outgoing rides the blue -> indigo accent on a soft diagonal;
+    // incoming is a clean white surface. Both memoized so they aren't rebuilt per recomposition.
     val bubbleBrush = remember(isMine) {
         if (isMine) {
             Brush.linearGradient(listOf(SunsetCoral, SunsetAmber, SunsetPink))
@@ -890,8 +953,14 @@ private fun TelegramMessageBubble(
             Brush.linearGradient(listOf(TgBubbleIn, TgBubbleIn))
         }
     }
-    val textColor = if (isMine) Color.White else TextPrimary
+    val textColor = if (isMine) Weave.BubbleOutText else TextPrimary
     val metaColor = if (isMine) TgBubbleOutTime else TgBubbleInTime
+
+    val highlightAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (highlighted) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(300),
+        label = "reply_highlight",
+    )
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -901,17 +970,31 @@ private fun TelegramMessageBubble(
             modifier = Modifier
                 .widthIn(min = 80.dp, max = 290.dp)
                 .clip(bubbleShape)
+                .then(
+                    if (highlightAlpha > 0f) {
+                        Modifier.border(2.dp, TgLink.copy(alpha = highlightAlpha), bubbleShape)
+                    } else {
+                        Modifier
+                    },
+                )
                 .background(bubbleBrush)
+                .then(
+                    // A hairline keeps the white incoming bubble distinct from the pale wallpaper.
+                    if (isMine) Modifier else Modifier.border(1.dp, Weave.Hairline, bubbleShape),
+                )
                 .combinedClickable(
                     onClick = onTap,
                     onLongClick = onLongPress,
+                    onDoubleClick = onDoubleTap,
                 )
                 .padding(horizontal = 14.dp, vertical = 8.dp),
         ) {
             // Quoted reply context — renders from the stored snapshot, no extra read.
             if (message.replyToText.isNotEmpty()) {
                 Row(
-                    modifier = Modifier.padding(bottom = 6.dp),
+                    modifier = Modifier
+                        .padding(bottom = 6.dp)
+                        .then(if (onQuotedReplyTap != null) Modifier.clickable(onClick = onQuotedReplyTap) else Modifier),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Box(
@@ -1086,7 +1169,7 @@ private fun TelegramMenuRow(
     icon: ImageVector,
     title: String,
     onClick: () -> Unit,
-    tint: Color = PureWhite,
+    tint: Color = TextPrimary,
 ) {
     Row(
         modifier = Modifier
