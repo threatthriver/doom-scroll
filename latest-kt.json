@@ -1,9 +1,9 @@
 {
-  "versionCode": 4,
-  "versionName": "0.3.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.3.0/SenderWire-0.3.0.apk",
-  "notes": "Groups, message requests, voice messages, video, location, contacts and polls. Full-screen photo viewer, online status and unread counts, smoother swipe to reply, faster notifications and many fixes.",
+  "versionCode": 5,
+  "versionName": "0.4.0",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.4.0/SenderWire-0.4.0.apk",
+  "notes": "Voice and video calls with web and phone, ringing even when the app is closed. Groups, message requests, voice messages, video, polls and more.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-20T09:43:10Z",
-  "sha256": "a0ccebd987cd6c435092ff7ad589ca2333ce9a397a39aa2fafebf055ac79ee91"
+  "publishedAt": "2026-10-20T11:08:56Z",
+  "sha256": "be779289d053dd57676a7987c1dcf93f42812af467f531aafa98bfba4ad00049"
 }
