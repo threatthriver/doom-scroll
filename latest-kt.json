@@ -1,9 +1,9 @@
 {
-  "versionCode": 5,
-  "versionName": "0.4.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.4.0/SenderWire-0.4.0.apk",
-  "notes": "Voice and video calls with web and phone, ringing even when the app is closed. Groups, message requests, voice messages, video, polls and more.",
+  "versionCode": 6,
+  "versionName": "0.4.1",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.4.1/SenderWire-0.4.1.apk",
+  "notes": "Call reconnect after network drops, Bluetooth and headset audio, call history, online status, pinned chats and search inside chats. Fixes group chats and rich messages on the website.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-20T11:08:56Z",
-  "sha256": "be779289d053dd57676a7987c1dcf93f42812af467f531aafa98bfba4ad00049"
+  "publishedAt": "2026-10-20T13:48:00Z",
+  "sha256": "9f82245da112273a38d0f9c90c7cfa35d0f089c85fce317c22720843210a3a73"
 }
