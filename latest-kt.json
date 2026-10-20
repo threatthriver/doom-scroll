@@ -1,8 +1,8 @@
 {
-  "versionCode": 1,
-  "versionName": "0.1.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.1.0/SenderWire-Kotlin-0.1.0.apk",
-  "notes": "SenderWire Kotlin preview.",
+  "versionCode": 2,
+  "versionName": "0.2.0",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.2.0/SenderWire-Kotlin-0.2.0.apk",
+  "notes": "Floating navigation bar, new icons matching the website, redesigned chat input with typing indicator, Continue with Google, smoother scrolling and a refreshed Home.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-20T00:00:00Z"
+  "publishedAt": "2026-10-20T08:30:00Z"
 }
