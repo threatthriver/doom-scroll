@@ -1,9 +1,9 @@
 {
-  "versionCode": 6,
-  "versionName": "0.4.1",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.4.1/SenderWire-0.4.1.apk",
-  "notes": "Call reconnect after network drops, Bluetooth and headset audio, call history, online status, pinned chats and search inside chats. Fixes group chats and rich messages on the website.",
+  "versionCode": 7,
+  "versionName": "0.5.0",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.5.0/SenderWire-0.5.0.apk",
+  "notes": "Message info, forward and star messages, crop your profile photo, profile Posts and Media tabs, YouTube previews in chat, bigger emoji, and smoother screens.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-20T13:48:00Z",
-  "sha256": "9f82245da112273a38d0f9c90c7cfa35d0f089c85fce317c22720843210a3a73"
+  "publishedAt": "2026-10-22T16:58:34Z",
+  "sha256": "662cce33dfa3f64c0973705057b9cfab2f2adc90db5c66230466308f549562d5"
 }
