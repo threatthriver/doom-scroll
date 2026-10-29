@@ -1,9 +1,9 @@
 {
-  "versionCode": 7,
-  "versionName": "0.5.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.5.0/SenderWire-0.5.0.apk",
-  "notes": "Message info, forward and star messages, crop your profile photo, profile Posts and Media tabs, YouTube previews in chat, bigger emoji, and smoother screens.",
+  "versionCode": 8,
+  "versionName": "0.6.0",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.6.0/SenderWire-0.6.0.apk",
+  "notes": "Opens end-to-end encrypted chats (with their photos, files and voice notes), safety numbers, private chat media, and a private Last seen. Ordinary chats work as before.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-22T16:58:34Z",
-  "sha256": "662cce33dfa3f64c0973705057b9cfab2f2adc90db5c66230466308f549562d5"
+  "publishedAt": "2026-10-29T18:08:18Z",
+  "sha256": "56a7a4af94d4aa63c085f48df4d27da7710403e07a283b30f576e89ef3702147"
 }
