@@ -23,6 +23,15 @@ download the APK from the release and open the system installer. A build below
   "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.1.0/SenderWire-Kotlin-0.1.0.apk",
   "notes": "What changed in this release.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-20T00:00:00Z"
+  "publishedAt": "2026-10-20T00:00:00Z",
+  "sha256": "hex SHA-256 of the universal APK (optional)",
+  "abis": {
+    "arm64-v8a": { "apkUrl": "https://.../SenderWire-0.1.0-arm64-v8a.apk", "sha256": "..." },
+    "armeabi-v7a": { "apkUrl": "https://.../SenderWire-0.1.0-armeabi-v7a.apk", "sha256": "..." }
+  }
 }
 ```
+
+`apkUrl` is the universal APK (works on every supported phone, and is what versions before 0.7.0 download).
+From 0.7.0 the app also reads `abis` and downloads the smaller build made for its own processor, falling back
+to `apkUrl` when none matches. Every file's `sha256` is checked before the installer opens.

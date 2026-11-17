@@ -1,9 +1,19 @@
 {
-  "versionCode": 8,
-  "versionName": "0.6.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.6.0/SenderWire-0.6.0.apk",
-  "notes": "Opens end-to-end encrypted chats (with their photos, files and voice notes), safety numbers, private chat media, and a private Last seen. Ordinary chats work as before.",
+  "versionCode": 9,
+  "versionName": "0.7.0",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.7.0/SenderWire-0.7.0.apk",
+  "notes": "New app icon, a smaller download (about 16 MB on most phones), faster start-up, and no colour flash when the app opens.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-10-29T18:08:18Z",
-  "sha256": "56a7a4af94d4aa63c085f48df4d27da7710403e07a283b30f576e89ef3702147"
+  "publishedAt": "2026-11-17T13:35:58Z",
+  "sha256": "f800de80d3f1cfa3311ddb4101cdc488b27632e709267626c2477d71f06e65b5",
+  "abis": {
+    "arm64-v8a": {
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.7.0/SenderWire-0.7.0-arm64-v8a.apk",
+      "sha256": "9507e036d2669a6e3dbaf35dc354ab8999847d14615125e8d7957c410a2770d0"
+    },
+    "armeabi-v7a": {
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.7.0/SenderWire-0.7.0-armeabi-v7a.apk",
+      "sha256": "5bf3f48a1cd380182f143b150a6ed43df881bfe2bf69e582360fb040b5ee66c6"
+    }
+  }
 }
