@@ -1,19 +1,19 @@
 {
-  "versionCode": 10,
-  "versionName": "0.8.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.8.0/SenderWire-0.8.0.apk",
-  "notes": "Write journal entries from your phone, today's question on Home, and notifications for encrypted chats that show the real message without the server ever seeing it.",
+  "versionCode": 11,
+  "versionName": "0.9.0",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.9.0/SenderWire-0.9.0.apk",
+  "notes": "A calmer message list, drafts, reply from notifications, call-style incoming calls with a timer, and missed-call notifications.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-17T17:01:52Z",
-  "sha256": "e3519989448c71c1ba392a7d571cde46759d23e5e5adf1195b74e38c016245a4",
+  "publishedAt": "2026-11-18T13:50:56Z",
+  "sha256": "c271a2d5a917cbd6f15df254e61c68b045c4aff98194952a8da8d7409e277da9",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.8.0/SenderWire-0.8.0-arm64-v8a.apk",
-      "sha256": "e7cb29c0a730bfff624f4448afc3fbac3bcb95a505e8fd71bd95b8dad9b67451"
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.9.0/SenderWire-0.9.0-arm64-v8a.apk",
+      "sha256": "4bf825678469c64f707c2c8ed9ecd99f2a3b0342ae71f51e265347b2e1f75d65"
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.8.0/SenderWire-0.8.0-armeabi-v7a.apk",
-      "sha256": "bd67b28792a6cd1b8e0db798026d21daa2c6dc485220df6db889507ea8a30993"
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.9.0/SenderWire-0.9.0-armeabi-v7a.apk",
+      "sha256": "50b370f4979a7099531b2c47496c87cd8a2f2a87838a7c74e3eb4e084e881fa8"
     }
   }
 }
