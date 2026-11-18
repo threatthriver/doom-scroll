@@ -1,21 +1,21 @@
 {
-  "versionCode": 14,
-  "versionName": "0.10.2",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.2/SenderWire-0.10.2.apk",
-  "notes": "More reliable calls\nA cleaner call screen with no overlapping buttons\nRings stop when the caller hangs up\nCalls stop cleanly when the connection fails",
+  "versionCode": 15,
+  "versionName": "0.10.3",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.3/SenderWire-0.10.3.apk",
+  "notes": "Steadier, faster chats\nThe feed opens offline with your last entries\nClearer prompts when a permission is off\nBigger tap targets and a proper tablet layout\nHidden follower lists respected",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-18T16:49:14Z",
-  "sha256": "c3377cda60b74e2a044207b059fa0c3016bbbe7038f830629e1b93ffe9c39a03",
+  "publishedAt": "2026-11-18T18:32:30Z",
+  "sha256": "366b2b7502cd3728b5c4f68f042c88a6fdeda23cd9292260f86a7670efa91aa3",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.2/SenderWire-0.10.2-arm64-v8a.apk",
-      "sha256": "c61040ea52f9e542a1ad8cb7db9e79909e59de8c8a5938a3eb003d1697131613",
-      "sizeBytes": 16427344
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.3/SenderWire-0.10.3-arm64-v8a.apk",
+      "sha256": "7b36e42b27e255e9cb1e937a80e8d0a92f33d522ba02d96f8e9cca2c6500acbb",
+      "sizeBytes": 16443736
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.2/SenderWire-0.10.2-armeabi-v7a.apk",
-      "sha256": "55241313c20332ad58c7c92484f7b67e86e42f33c4494bd1d26e7d3f0fc94340",
-      "sizeBytes": 11460324
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.3/SenderWire-0.10.3-armeabi-v7a.apk",
+      "sha256": "b23ac8a1fce6418a5321e79cf27316f98b41a0aa589282b30879994bf790850c",
+      "sizeBytes": 11476716
     }
   }
 }
