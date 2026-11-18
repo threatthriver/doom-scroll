@@ -1,20 +1,20 @@
 {
-  "versionCode": 15,
-  "versionName": "0.10.3",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.3/SenderWire-0.10.3.apk",
-  "notes": "Steadier, faster chats\nThe feed opens offline with your last entries\nClearer prompts when a permission is off\nBigger tap targets and a proper tablet layout\nHidden follower lists respected",
+  "versionCode": 16,
+  "versionName": "0.10.4",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.4/SenderWire-0.10.4.apk",
+  "notes": "A new chat look with compact bubbles\nThe time and ticks sit inline on the last line\nOne-pill composer: mic turns into send\nBig emoji with no bubble\nAn unread messages pill when you open a chat",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-18T18:32:30Z",
-  "sha256": "366b2b7502cd3728b5c4f68f042c88a6fdeda23cd9292260f86a7670efa91aa3",
+  "publishedAt": "2026-11-18T19:10:15Z",
+  "sha256": "240c16f867d5dd96bd856876678db1f66a20a87fa5d929d8cf0e51449edc21f0",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.3/SenderWire-0.10.3-arm64-v8a.apk",
-      "sha256": "7b36e42b27e255e9cb1e937a80e8d0a92f33d522ba02d96f8e9cca2c6500acbb",
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.4/SenderWire-0.10.4-arm64-v8a.apk",
+      "sha256": "b76c6f61d369c42c59e3b1918ba6cacc158ede7e475cfd8e3ff66333a0e93c8b",
       "sizeBytes": 16443736
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.3/SenderWire-0.10.3-armeabi-v7a.apk",
-      "sha256": "b23ac8a1fce6418a5321e79cf27316f98b41a0aa589282b30879994bf790850c",
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.4/SenderWire-0.10.4-armeabi-v7a.apk",
+      "sha256": "1659452be7542f926b07e9aed4b3f55b4b99b5eb1773b9569035c99458850d6a",
       "sizeBytes": 11476716
     }
   }
