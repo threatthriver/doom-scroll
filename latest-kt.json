@@ -1,19 +1,21 @@
 {
-  "versionCode": 11,
-  "versionName": "0.9.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.9.0/SenderWire-0.9.0.apk",
-  "notes": "A calmer message list, drafts, reply from notifications, call-style incoming calls with a timer, and missed-call notifications.",
+  "versionCode": 12,
+  "versionName": "0.10.0",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.0/SenderWire-0.10.0.apk",
+  "notes": "A calmer Home with quieter entries\nEdit your entries after posting\nWelcome tour for new accounts\nSmart search suggestions\nFollowers and Following lists\nStory captions, seen rings, viewers, reactions and replies\nA new update screen with download progress",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-18T13:50:56Z",
-  "sha256": "c271a2d5a917cbd6f15df254e61c68b045c4aff98194952a8da8d7409e277da9",
+  "publishedAt": "2026-11-18T14:51:33Z",
+  "sha256": "6e16d0f12dfb762336ca07888e46b8d01a6f46e0bb9e850ae354d9ad6617e9fe",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.9.0/SenderWire-0.9.0-arm64-v8a.apk",
-      "sha256": "4bf825678469c64f707c2c8ed9ecd99f2a3b0342ae71f51e265347b2e1f75d65"
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.0/SenderWire-0.10.0-arm64-v8a.apk",
+      "sha256": "dc28173e670101aeb8c465969ebc7715d9423114de4aa4d390057ab27eafffa5",
+      "sizeBytes": 16394588
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.9.0/SenderWire-0.9.0-armeabi-v7a.apk",
-      "sha256": "50b370f4979a7099531b2c47496c87cd8a2f2a87838a7c74e3eb4e084e881fa8"
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.0/SenderWire-0.10.0-armeabi-v7a.apk",
+      "sha256": "43907bbf031fb7d392d5f4ae8d042c84182156bcf01af44e6675976190f66b7b",
+      "sizeBytes": 11427568
     }
   }
 }
