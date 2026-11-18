@@ -4,7 +4,7 @@
   "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.2/SenderWire-0.10.2.apk",
   "notes": "More reliable calls\nA cleaner call screen with no overlapping buttons\nRings stop when the caller hangs up\nCalls stop cleanly when the connection fails",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-18T16:49:00Z",
+  "publishedAt": "2026-11-18T16:49:14Z",
   "sha256": "c3377cda60b74e2a044207b059fa0c3016bbbe7038f830629e1b93ffe9c39a03",
   "abis": {
     "arm64-v8a": {
