@@ -1,21 +1,21 @@
 {
-  "versionCode": 13,
-  "versionName": "0.10.1",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.1/SenderWire-0.10.1.apk",
-  "notes": "Animated GIFs in chat\nSend GIFs from the attach sheet\nGIFs and stickers from your keyboard\nA calmer Messages list",
+  "versionCode": 14,
+  "versionName": "0.10.2",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.2/SenderWire-0.10.2.apk",
+  "notes": "More reliable calls\nA cleaner call screen with no overlapping buttons\nRings stop when the caller hangs up\nCalls stop cleanly when the connection fails",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-18T15:58:49Z",
-  "sha256": "ffb830e16d56f16cccb96fefecdfb6ca8b52b47e0ebab5eeedde9ac912006739",
+  "publishedAt": "2026-11-18T16:49:00Z",
+  "sha256": "c3377cda60b74e2a044207b059fa0c3016bbbe7038f830629e1b93ffe9c39a03",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.1/SenderWire-0.10.1-arm64-v8a.apk",
-      "sha256": "0a11d027e47bb749e72be5a5da1b243dcd45b541d99baba3ef1a36a5ab15a8db",
-      "sizeBytes": 16410968
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.2/SenderWire-0.10.2-arm64-v8a.apk",
+      "sha256": "c61040ea52f9e542a1ad8cb7db9e79909e59de8c8a5938a3eb003d1697131613",
+      "sizeBytes": 16427344
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.1/SenderWire-0.10.1-armeabi-v7a.apk",
-      "sha256": "88f535a2a069e56f6979894581028ee3d02d1e67cf4fdf877932538cb89373d5",
-      "sizeBytes": 11443948
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.2/SenderWire-0.10.2-armeabi-v7a.apk",
+      "sha256": "55241313c20332ad58c7c92484f7b67e86e42f33c4494bd1d26e7d3f0fc94340",
+      "sizeBytes": 11460324
     }
   }
 }
