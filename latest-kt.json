@@ -1,21 +1,21 @@
 {
-  "versionCode": 17,
-  "versionName": "0.10.5",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.5/SenderWire-0.10.5.apk",
-  "notes": "Sign-up and password reset check the password rules up front\nClear messages when a password is missing a lowercase letter",
+  "versionCode": 18,
+  "versionName": "0.10.6",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.6/SenderWire-0.10.6.apk",
+  "notes": "Safer: notification links are signed and updates are verified before install\nSigning out wipes the previous account fully\nFixes for stale or deleted posts showing, double sends and chat read marks\nCorrect dates and counts across time zones and languages",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-19T12:11:22Z",
-  "sha256": "878045a8b22081c3dd7f767f777150eb319a85db5eeffd5e6b52f1cfccec16a2",
+  "publishedAt": "2026-11-19T14:37:08Z",
+  "sha256": "0b0e4c527672511c287825ac1ff3a6dd9ef827f9479d27a6ad6a31ceb7fb09f4",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.5/SenderWire-0.10.5-arm64-v8a.apk",
-      "sha256": "0e3523c87d93b2a4aef5690abd24fb55c1e2c95340691a4b6ced097cfdac5b0b",
-      "sizeBytes": 16443736
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.6/SenderWire-0.10.6-arm64-v8a.apk",
+      "sha256": "206f658c00e25392d287a609e2a8de28f2a268c7d47a626ad1429be4f1d241ea",
+      "sizeBytes": 16428240
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.5/SenderWire-0.10.5-armeabi-v7a.apk",
-      "sha256": "883bf148eb7079e7c0c2f51c30571015172ed525855177cfe9cd20503063055d",
-      "sizeBytes": 11476716
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.6/SenderWire-0.10.6-armeabi-v7a.apk",
+      "sha256": "91abeb413bae338716b01d8ea508c0f80715b9fa522adbe774fee84f6f587903",
+      "sizeBytes": 11461220
     }
   }
 }
