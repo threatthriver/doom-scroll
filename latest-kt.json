@@ -1,20 +1,20 @@
 {
-  "versionCode": 19,
-  "versionName": "0.10.7",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.7/SenderWire-0.10.7.apk",
-  "notes": "Your chats now back up automatically. The keys are locked with your Google account's encrypted backup, so after a reinstall or on a new phone you sign in and your chats open again. It needs a screen lock and Google backup turned on; otherwise use the recovery key in Settings, Privacy and safety, Chat backup.\nChat list shows the real last message of encrypted chats.\nChat: wallpapers (menu, Wallpaper), call cards, a floating reaction bar when you press and hold a message, a new attach panel, and the keyboard no longer leaves a gap or pushes the conversation up.\nStories: save drafts, keep watching through everyone, swipe down to close, smoother reactions.\nNotifications: filters and day groups. Menus look the same everywhere.\nForgot password: easier code entry and a live password checklist.",
+  "versionCode": 20,
+  "versionName": "0.10.8",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.8/SenderWire-0.10.8.apk",
+  "notes": "Security and stability update.\nSign-out now clears more of what is stored on the phone: Aura history, drafts, cached feed, chat wallpapers and downloaded media. Aura history is now kept per account and encrypted.\nIncoming calls: the screen wakes over the lock screen reliably, the call service no longer crashes on newer Android versions, and a call the caller cancels now leaves a missed-call notification.\nUpdates: a failed install shows a message instead of closing the app, and large downloads no longer time out.\nSaving photos works on Android 9 and older (it asks for storage permission).\nAura shows service notices and no longer prints raw interactive blocks.\nFewer freezes: drafts, contacts and sign-out work off the main thread.\nHide-connections is now saved with your profile.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-23T13:45:59Z",
-  "sha256": "e6029e0fa6083dd6381baf5a187710d515c7f6229dce40c9b3c710b12de20dca",
+  "publishedAt": "2026-11-24T18:41:04Z",
+  "sha256": "3fb756a03a95a62eab6e75f87776f16381c780f692424c89db918732ac3b5bda",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.7/SenderWire-0.10.7-arm64-v8a.apk",
-      "sha256": "c7dfc1d95968b7db9d70ec8e03072541772f15f644637f326945ef20a6fa3046",
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.8/SenderWire-0.10.8-arm64-v8a.apk",
+      "sha256": "bb46cec11c4812c992df5cc02fed3f870783b3cecf34c627edcb16b6c88a20ae",
       "sizeBytes": 16510650
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.7/SenderWire-0.10.7-armeabi-v7a.apk",
-      "sha256": "49a6af5fee568d505effa5635148c636ed624326ae152f2343944213a18b59c9",
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.8/SenderWire-0.10.8-armeabi-v7a.apk",
+      "sha256": "ed351cafffcf334cb95ede0795df765de223467418e49437f5f851ab20b12924",
       "sizeBytes": 11543630
     }
   }
