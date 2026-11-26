@@ -1,21 +1,21 @@
 {
-  "versionCode": 21,
-  "versionName": "0.10.9",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.9/SenderWire-0.10.9.apk",
-  "notes": "Open your chats on the website without typing a key.\nOn senderwire.com choose \"Open your chats with your phone\": it shows a code. Enter it in Settings > Chat backup > Link a browser, or tap the notification your phone now gets, and your chats open there. Nothing readable ever goes through our servers.",
+  "versionCode": 22,
+  "versionName": "0.10.10",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.10/SenderWire-0.10.10.apk",
+  "notes": "Attach files in Aura.\nTap the paperclip in Aura to send a photo, a PDF or a text or code file with your question. Photos are shrunk on your phone first. Files are used to answer and are not saved; a saved chat remembers only the file names.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-25T16:20:33Z",
-  "sha256": "23a8b65e1d6d5a18dbd6bc44402852c2f747da5b8e55cc930c8b0daaa01871c4",
+  "publishedAt": "2026-11-26T04:12:45Z",
+  "sha256": "751cf2a557611d312e4f92655d3ed587a52f2247e16fcda86701516a8c512bfe",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.9/SenderWire-0.10.9-arm64-v8a.apk",
-      "sha256": "2b93febb24c76c9338815611c76e0bbfed85f44946d25c5931de4803ee574977",
-      "sizeBytes": 16527030
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.10/SenderWire-0.10.10-arm64-v8a.apk",
+      "sha256": "72b4e5ada00630a273a6ab9e9b9d4f758cc1afc7a047dee0c027887b73a7475f",
+      "sizeBytes": 16527022
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.9/SenderWire-0.10.9-armeabi-v7a.apk",
-      "sha256": "86afd1122d5411b784ab87fda014d0b2f149a13560548d94e3f8314c545df3d6",
-      "sizeBytes": 11560010
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.10.10/SenderWire-0.10.10-armeabi-v7a.apk",
+      "sha256": "3d126cc57f76a58a081c0ee52b043565083ed2089832f8f37885ac1edd7b1a8a",
+      "sizeBytes": 11560002
     }
   }
 }
