@@ -1,21 +1,21 @@
 {
-  "versionCode": 25,
-  "versionName": "0.11.0",
-  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.11.0/SenderWire-0.11.0.apk",
-  "notes": "SenderWire 0.11.0: a new look and a more native app.\nNew logo and app icon, a calmer redesign with a serif wordmark, and Settings now lives in your Profile. Share text, photos, videos and files into SenderWire from any app, straight into a chat or a new journal entry. Notifications show who wrote, stack each chat into one conversation, and let you reply or mark as read; likes and follows are grouped. Clips play again. Reactions in encrypted chats are now encrypted too, and the app warns you when a contact's security code changes.",
+  "versionCode": 26,
+  "versionName": "0.11.1",
+  "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.11.1/SenderWire-0.11.1.apk",
+  "notes": "SenderWire 0.11.1\nA flatter bottom bar, and a closer look at photos. Photos open full screen: pinch to zoom around your fingers, double-tap to zoom in on a spot, drag down to close. Photos in a profile open in a swipeable viewer. Clips now play downloaded videos instead of YouTube's player.",
   "minSupportedVersionCode": 1,
-  "publishedAt": "2026-11-27T20:31:57Z",
-  "sha256": "5726daa636879c9cc5296d7e742d8683390593368a1c8548d35cc462b4b3de21",
+  "publishedAt": "2026-11-28T12:51:24Z",
+  "sha256": "959401a4d1e70373c3b7057729904cdd5329857a169782620063080d8ac2de98",
   "abis": {
     "arm64-v8a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.11.0/SenderWire-0.11.0-arm64-v8a.apk",
-      "sha256": "98b764a82ec9b0e50a946a4900f636255eba72ad9981cc78630e66112749da8e",
-      "sizeBytes": 16844844
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.11.1/SenderWire-0.11.1-arm64-v8a.apk",
+      "sha256": "ac5d59409143534725f76e1e2dcb84d8b1eea7bbf959de8c6dd35c6300acea02",
+      "sizeBytes": 17675505
     },
     "armeabi-v7a": {
-      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.11.0/SenderWire-0.11.0-armeabi-v7a.apk",
-      "sha256": "18be6b1a3a1149eeee44850031bf2811ddfc0ff47d8cf7bcb77f7cc57ff37591",
-      "sizeBytes": 11877824
+      "apkUrl": "https://github.com/threatthriver/doom-scroll/releases/download/kt-v0.11.1/SenderWire-0.11.1-armeabi-v7a.apk",
+      "sha256": "583ac36c366fb6f2420586141d3a7cc3b860022037af84551c84f922449346e1",
+      "sizeBytes": 12708485
     }
   }
 }
